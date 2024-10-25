@@ -189,6 +189,7 @@ class Plot:
 
     def _preprocess(self, prog):
         self.labels = dict()
+        self.argc = dict()
         i = 1
         pop_num = False
         while i < len(prog)-1:
@@ -196,12 +197,18 @@ class Plot:
                     and prog[i] in "+-*/xyzr"
                     and (type(prog[i+1]) in [int, float]
                         or prog[i+1].startswith("$"))):
-                prog[i:i+2] = [prog[i+1], "/", prog[i]]
+                if prog[i].isalpha():
+                    prog[i:i+2] = [prog[i+1], "/", prog[i]]
+                else:
+                    prog[i:i+2] = [prog[i+1], prog[i]]
+                i += 1
 
 
             elif prog[i] == "=":
+                assert prog[i-2].startswith("$")
                 assert prog[i-1].startswith("$")
-                self.labels[prog[i-1]] = i
+                self.labels[prog[i-2]] = i
+                self.argc[i] = int(prog[i-1][1:])
                 del prog[i]
                 i -= 1
 
@@ -230,7 +237,11 @@ class Plot:
                 continue
 
             if prog[ip].startswith("$"):
-                state.stack.append(self.labels[prog[ip]])
+                value = self.labels.get(prog[ip])
+                if value is None:
+                    value = state.stack[-int(prog[ip][1:])]
+                state.stack.append(value)
+                #print(state.stack)
                 ip += 1
                 continue
 
@@ -246,7 +257,7 @@ class Plot:
             if type(prog[ip+1]) in [int, float]:
                 rhs = den = prog[ip+1]
 
-            print(f"{prog[ip]:4} {ip} {depth}  {state.pos}  {state.stack}")
+            #print(f"{prog[ip]:4} {ip} {depth}  {state.pos}  {state.stack}")
 
             match prog[ip]:
                 case ";" | "i":
@@ -343,6 +354,9 @@ class Plot:
                 case "/":
                     num, den = _args(2)
                     state.stack.append(num/den)
+                case "+":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs + rhs)
 
                 case ":":
                     if state.path:
@@ -358,28 +372,48 @@ class Plot:
 
                 case "!":
                     if type(prog[ip-1]) is str and prog[ip-1].startswith("$"):
-                        assert rhs is not None
-                        label = self.labels[prog[ip-1]]
-                        if depth <= rhs:
-                            state, _ = self._exec(prog, state=state, single_statement=True, ip=label, depth=depth+1)
+                        label = _args(1)[0]
+                        state, _ = self._exec(prog, state=state, single_statement=True, ip=label, depth=depth+1)
                     elif type(prog[ip-1]) is int:
                         pass
                     else:
                         assert False
+
+                case "?":
+                    #print(state.stack, "cond")
+                    cond = _args(1)[0]
+                    if not cond:
+                        level = 0
+                        for j, c in enumerate(prog[ip+1:], start=ip+1):
+                            if c == " ":
+                                break
+                            elif c in ["[", "("]:
+                                level += 1
+                            elif c in ["]", ")"]:
+                                level -= 1
+
+                            if level < 0:
+                                break
+                        ip = j - 1
 
                 case _:
                     assert False, prog[ip]
 
             ip += 1
 
-        print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
+        argc = self.argc.get(start)
+        if argc:
+            state.stack = state.stack[:-argc]
+
+        #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
         return state, ip
 
 
     def gen_path(self, prog):
         tokens = self._tokenize(prog)
         tokens = self._preprocess(tokens)
-        print(''.join(map(str, tokens)))
+        #print("".join(map(str, tokens)))
+        #print(tokens)
 
         state = State()
 
@@ -418,15 +452,14 @@ plotter = Plot()
 # """)
 
 # points = plotter.gen_path("""3z>v 1r3 >l""")
+#
 
 
 
-
-points = plotter.gen_path("""
->v 8z(
-     $tri!2 l2r3>>l2r3>>l)
+points = plotter.gen_path("""8y;13x>v|4z
+(3:1r3;6$tri!)
 ]
-$tri=>l(1r3;1z2;3:1r3[$tri!4])>l
+$tri$0=>l(1r3;1z2;3:1r3[$1?$1+-1$tri!])>l
 """)
 #
 plot_path(*points)
