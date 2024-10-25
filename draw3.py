@@ -16,9 +16,9 @@ phi = (1 + 5**0.5)*0.5
 
 
 def plot_path(codes, verts):
-    print("Plot:", list(zip(codes, map(tuple, verts))))
+    #print("Plot:", list(zip(codes, map(tuple, verts))))
 
-    fig, ax = plt.subplots(figsize=(9 - 0.5, 8))
+    fig, ax = plt.subplots(figsize=((9 - 0.4) * 0.7, 8 * 0.7))
     pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
 
     ax.add_patch(pp1)
@@ -41,6 +41,7 @@ class State:
         self.path = []
         self.pos = P(2, -2)
         self.rot = 0
+        self.scale = P(1, 1)
         self.transformation_matrix = np.array([
             [1, 0],
             [0, 1],
@@ -64,6 +65,7 @@ class State:
         return self.transformation_matrix @ p
 
     def stretch_x(self, k):
+        self.scale[0] *= k
         mat = np.array([
             [k, 0],
             [0, 1],
@@ -72,6 +74,7 @@ class State:
         self.transformation_matrix = self.transformation_matrix @ mat
 
     def stretch_y(self, k):
+        self.scale[1] *= k
         mat = np.array([
             [1, 0],
             [0, k],
@@ -87,7 +90,7 @@ class State:
 
         self.transformation_matrix = self.transformation_matrix @ mat
 
-    def shear_y(self):
+    def shear_y(self, k):
         mat = np.array([
             [1, 0],
             [k, 1],
@@ -153,6 +156,7 @@ class Plot:
 
     def _tokenize(self, prog):
         tokens = [";"]
+        self.labels = dict()
         i = 0
 
         while i < len(prog):
@@ -166,12 +170,18 @@ class Plot:
                 tokens.append(num)
 
             elif ident := re.match(r"^\$\w+", prog[i:]):
-                tokens.append(prog[i:i+ident.end()])
+                tokens.append(ident[0])
                 i += ident.end()
+
+            elif prog[i] == "=":
+                assert tokens[-1].startswith("$")
+                self.labels[tokens[-1]] = len(tokens)
+                i += 1
 
             elif space := re.match(r"^\s+", prog[i:]):
                 tokens.append(" ")
                 i += space.end()
+
             elif prog[i] == ",":
                 i += 1
             else:
@@ -183,13 +193,17 @@ class Plot:
         return tokens
 
 
-    def _exec(self, prog, state, single_statement=False, ip=1, itr=None):
-        # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
+    def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
+        # #print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
         start = ip
 
         while ip < len(prog)-1:
             if type(prog[ip]) in [int, float]:
+                ip += 1
+                continue
+
+            if prog[ip].startswith("$"):
                 ip += 1
                 continue
 
@@ -205,7 +219,7 @@ class Plot:
             if type(prog[ip+1]) in [int, float]:
                 rhs = den = prog[ip+1]
 
-            print(f"{prog[ip]:4}  {state.rot}     ({state.pos[0]:>5.01f}, {state.pos[1]:5.01f}) {list(map(tuple, state.path))}")
+            #print(f"{prog[ip]:4}  {depth}    {state.pos}  {state.path}")
 
             match prog[ip]:
                 case ";" | "i":
@@ -223,7 +237,7 @@ class Plot:
                     state.pos = pos
 
                 case "[":
-                    st, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr)
+                    st, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
 
                     if st.path:
                         state.path.append(self._condense_path(st.path))
@@ -234,7 +248,7 @@ class Plot:
                     break
 
                 case "(":
-                    _, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr)
+                    _, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
                     self.points.append((Path.MOVETO, state.pos))
 
                 case ")":
@@ -261,7 +275,6 @@ class Plot:
                             state.curv[1] = prog[ip-1]
                         else:
                             state.curv[1] = state.curv[0] = prog[ip-1]
-
 
                     assert len(state.path) >= 3 and len(state.path) % 2 == 1
 
@@ -290,6 +303,9 @@ class Plot:
                     state.stretch_x(num/den)
                 case "y":
                     state.stretch_y(num/den)
+                case "z":
+                    state.stretch_x(num/den)
+                    state.stretch_y(num/den)
                 case "r":
                     state.rotate(num/den)
 
@@ -301,17 +317,28 @@ class Plot:
                         state.path.clear()
 
                     for n in range(int(num)):
-                        print(f"loop {n}")
-                        state, ip = self._exec(prog, state=state, single_statement=True, ip=start, itr=n+1)
-                        print(f"loopd {n}")
+                        #print(f"loop {n}")
+                        state, ip = self._exec(prog, state=state, single_statement=True, ip=start, itr=n+1, depth=depth)
+                        #print(f"loopd {n}")
                     ip -= 1
+
+                case "!":
+                    if type(prog[ip-1]) is str and prog[ip-1].startswith("$"):
+                        assert rhs is not None
+                        label = self.labels[prog[ip-1]]
+                        if depth <= rhs:
+                            state, _ = self._exec(prog, state=state, single_statement=True, ip=label, depth=depth+1)
+                    elif type(prog[ip-1]) is int:
+                        pass
+                    else:
+                        assert False
 
                 case _:
                     assert False, prog[ip]
 
             ip += 1
 
-        print(f"exec: \"{''.join(map(str, prog[start:ip]))}\"",)
+        #print(f"exec {depth}: \"{''.join(map(str, prog[start:ip]))}\"",)
         return state, ip
 
 
@@ -335,25 +362,36 @@ plotter = Plot()
 # plot_path(*plotter.gen_path("""
 # 3:r10[>l<]
 # """))
-#
-points = plotter.gen_path("""
-y2^
-((v>l) ([2:v][v>][>]1s) >> (v>^>v>^s) (v>^>v>^l))
-2yv
-(>l (y2v 4y3v>^<vs) >> (r3>l >l) (2r3>l >l) (>l))
-3yv 10:r10(>l10:(ir10(x8>l)))
->>>10:>l<r10
->>> 10:r10[>l< ] >>>> 10:r10>l
-4yv
+# #
+# points = plotter.gen_path("""
+# y2^
+# ((v>l) ([2:v][v>][>]1s) >> (v>^>v>^s) (v>^>v>^l))
+# 2yv
+# (>l (y2v 4y3v>^<vs) >> (r3>l >l) (2r3>l >l) (>l))
+# 3yv 10:r10(>l10:(ir10(x8>l)))
+# >>>10:>l<r10
+# >>> 10:r10[>l< ] >>>> 10:r10>l
+# 4yv
 
-10x<
+# 10x<
 
-(2x;r4>l) > (r4;2x>l)
+# (2x;r4>l) > (r4;2x>l)
 
-> (vl) 3x> (vl) 3:[>] (vl) [3:>] (vl)
+# > (vl) 3x> (vl) 3:[>] (vl) [3:>] (vl)
 
-""")
+# """)
 
 # plotter.gen_path("""(>l [v>]l) ([>v]l) v[v>]l""")
 
+
+
+
+points = plotter.gen_path("""
+<^ 8z(
+    $tri!0 2r3>>l2r3>>l)
+]
+$tri=>l(r3;z2;3:r3[$tri!2])>l
+
+""")
+#
 plot_path(*points)
