@@ -39,7 +39,8 @@ class State:
     def __init__(self):
         self.curv = P(0.5, 0.5)
         self.path = []
-        self.pos = P(2, -2)
+        self.stack = []
+        self.pos = P(0, 0)
         self.rot = 0
         self.scale = P(1, 1)
         self.transformation_matrix = np.array([
@@ -156,7 +157,6 @@ class Plot:
 
     def _tokenize(self, prog):
         tokens = [";"]
-        self.labels = dict()
         i = 0
 
         while i < len(prog):
@@ -173,11 +173,6 @@ class Plot:
                 tokens.append(ident[0])
                 i += ident.end()
 
-            elif prog[i] == "=":
-                assert tokens[-1].startswith("$")
-                self.labels[tokens[-1]] = len(tokens)
-                i += 1
-
             elif space := re.match(r"^\s+", prog[i:]):
                 tokens.append(" ")
                 i += space.end()
@@ -192,18 +187,50 @@ class Plot:
 
         return tokens
 
+    def _preprocess(self, prog):
+        self.labels = dict()
+        i = 1
+        pop_num = False
+        while i < len(prog)-1:
+            if (    type(prog[i]) is str
+                    and prog[i] in "+-*/xyzr"
+                    and (type(prog[i+1]) in [int, float]
+                        or prog[i+1].startswith("$"))):
+                prog[i:i+2] = [prog[i+1], "/", prog[i]]
+
+
+            elif prog[i] == "=":
+                assert prog[i-1].startswith("$")
+                self.labels[prog[i-1]] = i
+                del prog[i]
+                i -= 1
+
+            i += 1
+
+        return prog
 
     def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
         # #print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
         start = ip
 
+        def _args(n, defaults=None):
+            args = state.stack[-n:]
+            if defaults is not None:
+                assert n == len(defaults)
+                defaults[:min(n, len(state.stack))] = args
+                args = defaults
+            state.stack = state.stack[:-n]
+            return args
+
         while ip < len(prog)-1:
             if type(prog[ip]) in [int, float]:
+                state.stack.append(prog[ip])
                 ip += 1
                 continue
 
             if prog[ip].startswith("$"):
+                state.stack.append(self.labels[prog[ip]])
                 ip += 1
                 continue
 
@@ -219,7 +246,7 @@ class Plot:
             if type(prog[ip+1]) in [int, float]:
                 rhs = den = prog[ip+1]
 
-            #print(f"{prog[ip]:4}  {depth}    {state.pos}  {state.path}")
+            print(f"{prog[ip]:4} {ip} {depth}  {state.pos}  {state.stack}")
 
             match prog[ip]:
                 case ";" | "i":
@@ -229,6 +256,11 @@ class Plot:
                     if single_statement:
                         break
 
+                    if state.path:
+                        self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
+                        state.path.clear()
+
+                case "|":
                     if state.path:
                         self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
 
@@ -295,28 +327,30 @@ class Plot:
                     state.path.clear()
 
                 case "c":
-                    if lhs is not None:
-                        state.curv[0] = lhs
-                    if rhs is not None:
-                        state.curv[1] = rhs
+                    num, den = _args(2, state.curv)
                 case "x":
+                    num, den = _args(2, [1, 1])
                     state.stretch_x(num/den)
                 case "y":
+                    num, den = _args(2, [1, 1])
                     state.stretch_y(num/den)
                 case "z":
-                    state.stretch_x(num/den)
-                    state.stretch_y(num/den)
+                    v = _args(1)[0]
+                    state.stretch_x(v)
+                    state.stretch_y(v)
                 case "r":
-                    state.rotate(num/den)
+                    state.rotate(*_args(1))
+                case "/":
+                    num, den = _args(2)
+                    state.stack.append(num/den)
 
                 case ":":
-                    start = ip + 1
-
                     if state.path:
                         self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
                         state.path.clear()
 
-                    for n in range(int(num)):
+                    start = ip + 1
+                    for n in range(*_args(1)):
                         #print(f"loop {n}")
                         state, ip = self._exec(prog, state=state, single_statement=True, ip=start, itr=n+1, depth=depth)
                         #print(f"loopd {n}")
@@ -338,12 +372,14 @@ class Plot:
 
             ip += 1
 
-        #print(f"exec {depth}: \"{''.join(map(str, prog[start:ip]))}\"",)
+        print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
         return state, ip
 
 
     def gen_path(self, prog):
         tokens = self._tokenize(prog)
+        tokens = self._preprocess(tokens)
+        print(''.join(map(str, tokens)))
 
         state = State()
 
@@ -381,17 +417,16 @@ plotter = Plot()
 
 # """)
 
-# plotter.gen_path("""(>l [v>]l) ([>v]l) v[v>]l""")
+# points = plotter.gen_path("""3z>v 1r3 >l""")
 
 
 
 
 points = plotter.gen_path("""
-<^ 8z(
-    $tri!0 2r3>>l2r3>>l)
+>v 8z(
+     $tri!2 l2r3>>l2r3>>l)
 ]
-$tri=>l(r3;z2;3:r3[$tri!2])>l
-
+$tri=>l(1r3;1z2;3:1r3[$tri!4])>l
 """)
 #
 plot_path(*points)
