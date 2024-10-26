@@ -17,16 +17,16 @@ phi = (1 + 5**0.5)*0.5
 
 
 def plot_path(codes, verts):
-    #print("Plot:", list(zip(codes, map(tuple, verts))))
+    ##print("Plot:", list(zip(codes, map(tuple, verts))))
 
-    fig, ax = plt.subplots(figsize=((9 - 0.4) * 0.7, 8 * 0.7))
+    fig, ax = plt.subplots(figsize=((20 - 0) * 0.35, 20 * 0.35))
     pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
 
     ax.add_patch(pp1)
-    ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
+    # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
 
-    ax.set_ylim(-16, 0)
-    ax.set_xlim(0, 18)
+    ax.set_ylim(0, 20)
+    ax.set_xlim(0, 20)
     ax.grid(zorder=-1, color="#323232")
 
     plt.tight_layout()
@@ -161,7 +161,7 @@ class Plot:
         i = 0
 
         while i < len(prog):
-            if num := re.match(r"^-?\d*\.?\d+(e[+-]?\d+)?", prog[i:]):
+            if num := re.match(r"^\d*\.?\d+(e[+-]?\d+)?", prog[i:]):
                 i += num.end()
                 num = num[0]
                 if "." in num or "e" in num:
@@ -194,47 +194,49 @@ class Plot:
         i = 1
         pop_num = False
         while i < len(prog)-1:
-            if (    type(prog[i]) is str
-                    and prog[i] in "+-*/xyzr"
+            #print(i, *prog)
+            if (    prog[i] in ["+", "-", "*", "/", "c"]
                     and (type(prog[i+1]) in [int, float]
                         or prog[i+1].startswith("$"))):
-                if prog[i].isalpha():
-                    prog[i:i+2] = [prog[i+1], "/", prog[i]]
-                else:
-                    prog[i:i+2] = [prog[i+1], prog[i]]
+                prog[i:i+2] = [prog[i+1], prog[i]]
                 i += 1
 
+            elif (  type(prog[i]) is str
+                    and prog[i] in ["x", "y", "z", "r"]
+                    and (type(prog[i+1]) in [int, float]
+                        or prog[i+1].startswith("$"))):
+                prog[i:i+2] = [prog[i+1], "/", prog[i]]
+                i += 2
 
             elif prog[i] == "=":
-                assert prog[i-2].startswith("$")
+                assert type(prog[i-2]) is int
                 assert prog[i-1].startswith("$")
-                self.labels[prog[i-2]] = i
-                self.argc[i] = int(prog[i-1][1:])
-                del prog[i]
-                i -= 1
+                self.labels[prog[i-1]] = i - 2
+                self.argc[i-2] = prog[i-2]
+                del prog[i-2:i+1]
+                i -= 3
 
             i += 1
 
         return prog
 
     def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
-        # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
+        # #print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
         start = ip
 
-        def _args(n, defaults=None):
+        def _args(n):
+            assert len(state.stack) >= n
             args = state.stack[-n:]
-            if defaults is not None:
-                assert n == len(defaults)
-                defaults[:min(n, len(state.stack))] = args
-                args = defaults
             state.stack = state.stack[:-n]
             return args
 
         while ip < len(prog)-1:
-            # print(f"{prog[ip]:4} {ip} {depth}  {state.pos}  {state.path}")
+            #print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
 
-            if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^"]:
+            if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
+                if self.points[-1][0] == Path.MOVETO:
+                    self.points.pop()
                 self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
                 state.path.clear()
 
@@ -255,7 +257,7 @@ class Plot:
                 case ";" | "i":
                     pass
 
-                case " " | "\n":
+                case " ":
                     if single_statement:
                         break
 
@@ -276,6 +278,8 @@ class Plot:
 
                 case "(":
                     _, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
+                    if self.points[-1][0] == Path.MOVETO:
+                        self.points.pop()
                     self.points.append((Path.MOVETO, state.pos))
 
                 case ")":
@@ -294,6 +298,14 @@ class Plot:
                     for p in state.path:
                         self.points.append((Path.LINETO, state.translate(p)))
                     state.path.clear()
+
+                case "M":
+                    self.points.append((Path.MOVETO, self.points[-1][1]))
+
+                case "L":
+                    if len(self.points) > 1 and self.points[-1][0] == Path.MOVETO:
+                        self.points.pop()
+                        self.points.append((Path.LINETO, state.pos))
 
                 case "s":
                     if type(prog[ip-1]) in [int, float]:
@@ -323,7 +335,7 @@ class Plot:
                     state.path.clear()
 
                 case "c":
-                    num, den = _args(2, state.curv)
+                    state.curv = _args(2)
                 case "x":
                     state.stretch_x(_args(1)[0])
                 case "y":
@@ -340,35 +352,31 @@ class Plot:
                 case "+":
                     lhs, rhs = _args(2)
                     state.stack.append(lhs + rhs)
+                case "-":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs - rhs)
 
                 case ":":
-                    if state.path:
-                        self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
-                        state.path.clear()
-
                     start = ip + 1
                     for n in range(*_args(1)):
-                        #print(f"loop {n}")
+                        ##print(f"loop {n}")
                         state, ip = self._exec(prog, state=state, single_statement=True, ip=start, itr=n+1, depth=depth)
-                        #print(f"loopd {n}")
+                        ##print(f"loopd {n}")
                     ip -= 1
 
                 case "!":
-                    if type(prog[ip-1]) is str and prog[ip-1].startswith("$"):
-                        label = _args(1)[0]
-                        state, _ = self._exec(prog, state=state, single_statement=True, ip=label, depth=depth+1)
-                    elif type(prog[ip-1]) is int:
-                        pass
-                    else:
-                        assert False
+                    label = _args(1)[0]
+                    state, _ = self._exec(prog, state=state, single_statement=True, ip=label, depth=depth+1)
+
+                    state.stack = state.stack[:-self.argc[label]]
 
                 case "?":
-                    #print(state.stack, "cond")
+                    ##print(state.stack, "cond")
                     cond = _args(1)[0]
                     if not cond:
                         level = 0
                         for j, c in enumerate(prog[ip+1:], start=ip+1):
-                            if c == " ":
+                            if c == " " and level == 0:
                                 break
                             elif c in ["[", "("]:
                                 level += 1
@@ -379,14 +387,13 @@ class Plot:
                                 break
                         ip = j - 1
 
+                case "b":
+                    break
+
                 case _:
                     assert False, prog[ip]
 
             ip += 1
-
-        argc = self.argc.get(start)
-        if argc:
-            state.stack = state.stack[:-argc]
 
         #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
         return state, ip
@@ -395,7 +402,7 @@ class Plot:
     def gen_path(self, prog):
         tokens = self._tokenize(prog)
         tokens = self._preprocess(tokens)
-        print(" ".join(map(str, tokens)))
+        #print(" ".join(map(str, tokens)))
 
         state = State()
 
@@ -441,8 +448,17 @@ t0 = time.time()
 # points = plotter.gen_path("""8y 13x >v|4z
 # (3:1r3;6$tri!)
 # ]
-# $tri$0=>l(1r3;1z2;3:1r3[$1?$1+-1$tri!])>l
+# $tri$1=>l(1r3;1z2;3:1r3[$1?$1-1$tri!])>l
 # """)
+points = plotter.gen_path("""10y;10x>^|4z;3r4
+0.2z6
 
+1:1r4;(M11$dra!)]
+1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
+1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
+
+
+1$zdra=[$1?1r8$1-1$zdra!|7r8$1-1$zdra!b 1z4;1r8> L >>[>v]vvl v]
+""")
 print(f"time: {time.time() - t0:.2f} points: {len(points[0])}")
 plot_path(*points)
