@@ -170,6 +170,10 @@ class Plot:
                     num = int(num)
                 tokens.append(num)
 
+            elif ident := re.match(r"^\$\d+", prog[i:]):
+                tokens.append(ident[0])
+                i += ident.end()
+
             elif ident := re.match(r"^\$\w+", prog[i:]):
                 tokens.append(ident[0])
                 i += ident.end()
@@ -201,8 +205,7 @@ class Plot:
                 prog[i:i+2] = [prog[i+1], prog[i]]
                 i += 1
 
-            elif (  type(prog[i]) is str
-                    and prog[i] in ["x", "y", "z", "r"]
+            elif (  prog[i] in ["x", "y", "z", "r"]
                     and (type(prog[i+1]) in [int, float]
                         or prog[i+1].startswith("$"))):
                 prog[i:i+2] = [prog[i+1], "/", prog[i]]
@@ -402,7 +405,7 @@ class Plot:
     def gen_path(self, prog):
         tokens = self._tokenize(prog)
         tokens = self._preprocess(tokens)
-        #print(" ".join(map(str, tokens)))
+        print(*tokens)
 
         state = State()
 
