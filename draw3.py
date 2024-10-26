@@ -1,6 +1,7 @@
 import copy
 import operator
 import re
+import time
 
 import numpy as np
 
@@ -217,7 +218,7 @@ class Plot:
         return prog
 
     def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
-        # #print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
+        # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
         start = ip
 
@@ -231,6 +232,12 @@ class Plot:
             return args
 
         while ip < len(prog)-1:
+            # print(f"{prog[ip]:4} {ip} {depth}  {state.pos}  {state.path}")
+
+            if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^"]:
+                self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
+                state.path.clear()
+
             if type(prog[ip]) in [int, float]:
                 state.stack.append(prog[ip])
                 ip += 1
@@ -241,23 +248,8 @@ class Plot:
                 if value is None:
                     value = state.stack[-int(prog[ip][1:])]
                 state.stack.append(value)
-                #print(state.stack)
                 ip += 1
                 continue
-
-            lhs = rhs = None
-            num = den = 1
-            if type(prog[ip-1]) in [int, float]:
-                lhs = num = prog[ip-1]
-
-            # TODO: replace this with variable $i
-            if prog[ip-1] == "i": lhs = num = itr
-            if prog[ip+1] == "i": rhs = den = itr
-
-            if type(prog[ip+1]) in [int, float]:
-                rhs = den = prog[ip+1]
-
-            #print(f"{prog[ip]:4} {ip} {depth}  {state.pos}  {state.stack}")
 
             match prog[ip]:
                 case ";" | "i":
@@ -267,21 +259,13 @@ class Plot:
                     if single_statement:
                         break
 
-                    if state.path:
-                        self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
-                        state.path.clear()
-
                 case "|":
-                    if state.path:
-                        self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
-
                     pos = state.pos
                     state = initial_state.clone()
                     state.pos = pos
 
                 case "[":
                     st, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
-
                     if st.path:
                         state.path.append(self._condense_path(st.path))
 
@@ -319,7 +303,8 @@ class Plot:
                         else:
                             state.curv[1] = state.curv[0] = prog[ip-1]
 
-                    assert len(state.path) >= 3 and len(state.path) % 2 == 1
+                    assert len(state.path) >= 3, state.path
+                    assert len(state.path) % 2 == 1, state.path
 
                     v2 = state.path.pop(0)
 
@@ -340,17 +325,15 @@ class Plot:
                 case "c":
                     num, den = _args(2, state.curv)
                 case "x":
-                    num, den = _args(2, [1, 1])
-                    state.stretch_x(num/den)
+                    state.stretch_x(_args(1)[0])
                 case "y":
-                    num, den = _args(2, [1, 1])
-                    state.stretch_y(num/den)
+                    state.stretch_y(_args(1)[0])
                 case "z":
                     v = _args(1)[0]
                     state.stretch_x(v)
                     state.stretch_y(v)
                 case "r":
-                    state.rotate(*_args(1))
+                    state.rotate(_args(1)[0])
                 case "/":
                     num, den = _args(2)
                     state.stack.append(num/den)
@@ -412,8 +395,7 @@ class Plot:
     def gen_path(self, prog):
         tokens = self._tokenize(prog)
         tokens = self._preprocess(tokens)
-        #print("".join(map(str, tokens)))
-        #print(tokens)
+        print(" ".join(map(str, tokens)))
 
         state = State()
 
@@ -451,15 +433,16 @@ plotter = Plot()
 
 # """)
 
-# points = plotter.gen_path("""3z>v 1r3 >l""")
+# points = plotter.gen_path("""v[>]vs""")
 #
 
 
+t0 = time.time()
+# points = plotter.gen_path("""8y 13x >v|4z
+# (3:1r3;6$tri!)
+# ]
+# $tri$0=>l(1r3;1z2;3:1r3[$1?$1+-1$tri!])>l
+# """)
 
-points = plotter.gen_path("""8y;13x>v|4z
-(3:1r3;6$tri!)
-]
-$tri$0=>l(1r3;1z2;3:1r3[$1?$1+-1$tri!])>l
-""")
-#
+print(f"time: {time.time() - t0:.2f} points: {len(points[0])}")
 plot_path(*points)
