@@ -210,6 +210,7 @@ class Plot:
             "-": operator.sub,
             "*": operator.mul,
             "/": operator.truediv,
+            "p": operator.pow,
         }
 
         i = 1
@@ -301,7 +302,7 @@ class Plot:
             return args
 
         while ip < len(prog)-1:
-            #print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
+            # print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
 
             if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
                 self._add_point(Path.MOVETO, state.translate(self._condense_path(state.path)))
@@ -322,7 +323,7 @@ class Plot:
 
                 case "$":
                     arg, = _args(1)
-                    state.stack.append(state.stack[-arg])
+                    state.stack.append(initial_state.stack[-arg])
 
                 case "|":
                     pos = state.pos
@@ -435,15 +436,21 @@ class Plot:
                     state.stretch_y(v)
                 case "r":
                     state.rotate(_args(1)[0])
-                case "/":
-                    num, den = _args(2)
-                    state.stack.append(num/den)
                 case "+":
                     lhs, rhs = _args(2)
                     state.stack.append(lhs + rhs)
                 case "-":
                     lhs, rhs = _args(2)
                     state.stack.append(lhs - rhs)
+                case "*":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs * rhs)
+                case "/":
+                    num, den = _args(2)
+                    state.stack.append(num/den)
+                case "p":
+                    base, exp = _args(2)
+                    state.stack.append(base ** exp)
 
                 case ":":
                     start = ip + 1
@@ -613,17 +620,27 @@ plot = Plot()
 
 dragon = plot.compile(
     """
-    4:(M$1$dra!L)1r4
+    1:(M$1$dra!L)1r4
 
     ]
 
     1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
     1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
 
+    1$zdra=[$1?1r8$1-1$zdra!|7r8;0-1y$1-1$zdra!b 1z4;1r8> L >>[>v]vvl v]
     1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
 """)
+hilbert = plot.compile(
+    """
+    1 2 1$1+p1-/z
+    $1$hil!
+    ]
 
-plot.run(dragon, 14)
+    1$hil=[$1?$1-1[3r4;0-1x$hil! | ^l $hil! | >l $hil! | vl 1r4;0-1x$hil!]b ^>vl]
+""")
+
+# plot.run(dragon, 14)
+plot.run(hilbert, 5)
 plot.show()
 
 # dragon_animation()
