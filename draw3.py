@@ -198,8 +198,11 @@ class Plot:
         return tokens
 
     def _preprocess(self, prog):
-        self.labels = dict()
-        self.argc = dict()
+        functions = dict()
+        argc = dict()
+        conditionals = list()
+        references = list()
+        calls = list()
         i = 1
         pop_num = False
         while i < len(prog)-1:
@@ -216,15 +219,60 @@ class Plot:
                 prog[i:i+2] = [prog[i+1], "/", prog[i]]
                 i += 2
 
+            elif type(prog[i]) is str and prog[i].startswith("$"):
+                if prog[i][1:].isdigit():
+                    prog[i] = int(prog[i][1:])
+                    prog.insert(i + 1, "$")
+                else:
+                    references.append(i)
+
             elif prog[i] == "=":
                 assert type(prog[i-2]) is int
                 assert prog[i-1].startswith("$")
-                self.labels[prog[i-1]] = i - 2
-                self.argc[i-2] = prog[i-2]
+                addr = i - 2
+                name = prog[i-1]
+                argc = prog[i-2]
+
+                functions[name] = (addr, argc)
+
                 del prog[i-2:i+1]
+                references.pop()
                 i -= 3
 
+            elif prog[i] == "?":
+                prog.insert(i, None)
+                conditionals.append(i)
+                i += 1
+
+            elif prog[i] == "!":
+                calls.append(i)
+                prog.insert(i, None)
+                i += 1
+
             i += 1
+
+        for i in conditionals:
+            level = 0
+            for j, c in enumerate(prog[i+1:], start=i+1):
+                if c == " " and level == 0:
+                    break
+                elif c in ["[", "("]:
+                    level += 1
+                elif c in ["]", ")"]:
+                    level -= 1
+
+                if level < 0:
+                    break
+            prog[i] = j
+
+        for i in calls:
+            addr, argc = functions[prog[i-1]]
+            prog[i] = argc
+
+        for i in references:
+            fninfo = functions.get(prog[i])
+            if fninfo:
+                prog[i] = fninfo[0]
 
         return prog
 
@@ -252,13 +300,6 @@ class Plot:
                 ip += 1
                 continue
 
-            if prog[ip].startswith("$"):
-                value = self.labels.get(prog[ip])
-                if value is None:
-                    value = state.stack[-int(prog[ip][1:])]
-                state.stack.append(value)
-                ip += 1
-                continue
 
             match prog[ip]:
                 case ";":
@@ -267,6 +308,10 @@ class Plot:
                 case " ":
                     if single_statement:
                         break
+
+                case "$":
+                    arg, = _args(1)
+                    state.stack.append(state.stack[-arg])
 
                 case "|":
                     pos = state.pos
@@ -370,8 +415,6 @@ class Plot:
                         self._add_point(Path.CURVE3, curve[-2][1] + 0.25 * v)
                         self._add_point(Path.CURVE3, curve[-1][1])
 
-
-
                 case "c":
                     state.curv = _args(2)
                 case "x":
@@ -379,7 +422,7 @@ class Plot:
                 case "y":
                     state.stretch_y(_args(1)[0])
                 case "z":
-                    v = _args(1)[0]
+                    v, = _args(1)
                     state.stretch_x(v)
                     state.stretch_y(v)
                 case "r":
@@ -403,27 +446,16 @@ class Plot:
                     ip -= 1
 
                 case "!":
-                    label = _args(1)[0]
-                    state, _ = self._exec(prog, state=state, single_statement=True, ip=label, depth=depth+1)
+                    addr, argc = _args(2)
+                    state, _ = self._exec(prog, state=state, single_statement=True, ip=addr, depth=depth+1)
 
-                    state.stack = state.stack[:-self.argc[label]]
+                    state.stack = state.stack[:-argc]
 
                 case "?":
-                    ##print(state.stack, "cond")
-                    cond = _args(1)[0]
-                    if not cond:
-                        level = 0
-                        for j, c in enumerate(prog[ip+1:], start=ip+1):
-                            if c == " " and level == 0:
-                                break
-                            elif c in ["[", "("]:
-                                level += 1
-                            elif c in ["]", ")"]:
-                                level -= 1
+                    cond, stmt_end = _args(2)
 
-                            if level < 0:
-                                break
-                        ip = j - 1
+                    if not cond:
+                        ip = stmt_end - 1
 
                 case "b":
                     break
@@ -491,7 +523,7 @@ def dragon_animation():
         1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
     """)
 
-    plot.run(dragon, 10)
+    plot.run(dragon, 12)
     plot.show()
 
     codes, verts = plot.get_path()
@@ -504,7 +536,6 @@ def dragon_animation():
 
     ax.set_aspect('equal')
 
-
     by = (plot.ymax - plot.ymin) * 0.1
     bx = (plot.xmax - plot.xmin) * 0.1
     xlims = (plot.xmin - bx, plot.xmax + bx)
@@ -512,26 +543,23 @@ def dragon_animation():
     ax.set_xlim(*xlims)
     ax.set_ylim(*ylims)
 
-
     plt.axis('off')
     plt.tight_layout()
 
-
     def animate(i):
-        print(f"animate {i}")
-
         if i < 15:
+            print(f"animate {i:2} ", end="")
             plot.run(dragon, i)
 
-        by = (plot.ymax - plot.ymin) * 0.1
-        bx = (plot.xmax - plot.xmin) * 0.1
-        xlims = (plot.xmin - bx, plot.xmax + bx)
-        ylims = (plot.ymin - by, plot.ymax + by)
-        ax.set_xlim(*xlims)
-        ax.set_ylim(*ylims)
+            by = (plot.ymax - plot.ymin) * 0.1
+            bx = (plot.xmax - plot.xmin) * 0.1
+            xlims = (plot.xmin - bx, plot.xmax + bx)
+            ylims = (plot.ymin - by, plot.ymax + by)
+            ax.set_xlim(*xlims)
+            ax.set_ylim(*ylims)
 
-        codes, verts = plot.get_path()
-        patch.set_path(Path(verts, codes))
+            codes, verts = plot.get_path()
+            patch.set_path(Path(verts, codes))
         return patch,
 
 
