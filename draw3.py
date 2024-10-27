@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.path as mpath
@@ -16,21 +17,7 @@ Path = mpath.Path
 phi = (1 + 5**0.5)*0.5
 
 
-def plot_path(codes, verts):
-    ##print("Plot:", list(zip(codes, map(tuple, verts))))
 
-    fig, ax = plt.subplots(figsize=((20 - 0) * 0.35, 20 * 0.35))
-    pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
-
-    ax.add_patch(pp1)
-    # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
-
-    ax.set_ylim(0, 20)
-    ax.set_xlim(0, 20)
-    ax.grid(zorder=-1, color="#323232")
-
-    plt.tight_layout()
-    plt.show()
 
 
 P = lambda x, y: np.array([x, y], dtype="double")
@@ -148,13 +135,31 @@ class State:
 
 class Plot:
     def __init__(self):
-        self.points = []
+        self.reset()
+
+    def reset(self, reset_pos=True):
+        self.state = State()
+
+        self.points = [(Path.MOVETO, self.state.pos)]
+
+        self.xmin = float('inf')
+        self.xmax = float('-inf')
+        self.ymin = float('inf')
+        self.ymax = float('-inf')
+
 
     def _condense_path(self, path):
         r = P(0, 0)
         for p in path:
             r += p
         return r
+
+    def _add_point(self, cmd, point):
+        self.xmin = min(self.xmin, point[0])
+        self.xmax = max(self.xmax, point[0])
+        self.ymin = min(self.ymin, point[1])
+        self.ymax = max(self.ymax, point[1])
+        self.points.append((cmd, point))
 
     def _tokenize(self, prog):
         tokens = [";"]
@@ -224,7 +229,7 @@ class Plot:
         return prog
 
     def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
-        # #print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
+        # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
 
         def _args(n):
@@ -239,7 +244,7 @@ class Plot:
             if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
                 if self.points[-1][0] == Path.MOVETO:
                     self.points.pop()
-                self.points.append((Path.MOVETO, state.translate(self._condense_path(state.path))))
+                self._add_point(Path.MOVETO, state.translate(self._condense_path(state.path)))
                 state.path.clear()
 
             if type(prog[ip]) in [int, float]:
@@ -282,7 +287,7 @@ class Plot:
                     _, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
                     if self.points[-1][0] == Path.MOVETO:
                         self.points.pop()
-                    self.points.append((Path.MOVETO, state.pos))
+                    self._add_point(Path.MOVETO, state.pos)
 
                 case ")":
                     break
@@ -298,16 +303,16 @@ class Plot:
 
                 case "l":
                     for p in state.path:
-                        self.points.append((Path.LINETO, state.translate(p)))
+                        self._add_point(Path.LINETO, state.translate(p))
                     state.path.clear()
 
                 case "M":
-                    self.points.append((Path.MOVETO, self.points[-1][1]))
+                    self._add_point(Path.MOVETO, self.points[-1][1])
 
                 case "L":
                     if len(self.points) > 1 and self.points[-1][0] == Path.MOVETO:
                         self.points.pop()
-                        self.points.append((Path.LINETO, state.pos))
+                        self._add_point(Path.LINETO, state.pos)
 
                 case "s":
                     if type(prog[ip-1]) in [int, float]:
@@ -328,11 +333,11 @@ class Plot:
                         v2 = state.path[1]
                         state.path = state.path[2:]
 
-                        self.points.append((Path.CURVE4, state.pos + v1 * state.curv[0]))
+                        self._add_point(Path.CURVE4, state.pos + v1 * state.curv[0])
                         state.pos = state.pos + p
-                        self.points.append((Path.CURVE4, state.pos - v2 * state.curv[1]))
+                        self._add_point(Path.CURVE4, state.pos - v2 * state.curv[1])
 
-                        self.points.append((Path.CURVE4, state.pos))
+                        self._add_point(Path.CURVE4, state.pos)
 
                     state.path.clear()
 
@@ -350,20 +355,20 @@ class Plot:
                         v2 = curve[1][1] - curve[0][1]
                         v = v1 + v2
 
-                        self.points.append((Path.CURVE3, curve[0][1] - 0.25 * v))
-                        self.points.append((Path.CURVE3, curve[0][1]))
+                        self._add_point(Path.CURVE3, curve[0][1] - 0.25 * v)
+                        self._add_point(Path.CURVE3, curve[0][1])
 
                         for i in range(1, len(curve)-1):
-                            self.points.append((Path.CURVE4, curve[i-1][1] + 0.25 * v))
+                            self._add_point(Path.CURVE4, curve[i-1][1] + 0.25 * v)
                             v1 = v2
                             v2 = curve[i+1][1] - curve[i][1]
                             v = v1 + v2
-                            self.points.append((Path.CURVE4, curve[i][1] - 0.25 * v))
-                            self.points.append((Path.CURVE4, curve[i][1]))
+                            self._add_point(Path.CURVE4, curve[i][1] - 0.25 * v)
+                            self._add_point(Path.CURVE4, curve[i][1])
 
 
-                        self.points.append((Path.CURVE3, curve[-2][1] + 0.25 * v))
-                        self.points.append((Path.CURVE3, curve[-1][1]))
+                        self._add_point(Path.CURVE3, curve[-2][1] + 0.25 * v)
+                        self._add_point(Path.CURVE3, curve[-1][1])
 
 
 
@@ -431,67 +436,109 @@ class Plot:
         #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
         return state, ip
 
+    def compile(self, code):
+        tokens = self._tokenize(code)
+        prog = self._preprocess(tokens)
+        print(*prog)
+        return prog
 
-    def gen_path(self, prog):
-        tokens = self._tokenize(prog)
-        tokens = self._preprocess(tokens)
-        print(*tokens)
+    def run(self, prog, *args):
+        t0 = time.time()
 
-        state = State()
+        self.reset()
+        self.state.stack = list(args)
+        self._exec(prog, self.state)
 
-        if not self.points:
-            self.points = [(Path.MOVETO, state.pos)]
+        print(f"time: {time.time() - t0:.2f} points: {len(self.points)}")
 
-        self._exec(tokens, state)
+    def run_code(self, code):
+        self.run(self.compile(code))
 
+    def get_path(self):
         return list(zip(*self.points))
 
+    def show(self):
+        codes, verts = self.get_path()
 
-plotter = Plot()
+        fig, ax = plt.subplots(figsize=(8, 6))
+        pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
 
+        ax.add_patch(pp1)
+        # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
 
-# plot_path(*plotter.gen_path("2x;2y[ 4y3v>^<vs y2^ v>^<vl vv 4y3v>^>v>^s 3x<y2^ v>^>v>^l"))
-# plot_path(*plotter.gen_path("""
-# 3:r10[>l<]
-# """))
-# #
-# points = plotter.gen_path("""
-# y2^
-# ((v>l) ([2:v][v>][>]1s) >> (v>^>v>^s) (v>^>v>^l))
-# 2yv
-# (>l (y2v 4y3v>^<vs) >> (r3>l >l) (2r3>l >l) (>l))
-# 3yv 10:r10(>l10:(ir10(x8>l)))
-# >>>10:>l<r10
-# >>> 10:r10[>l< ] >>>> 10:r10>l
-# 4yv
+        by = (self.ymax - self.ymin) * 0.1
+        bx = (self.xmax - self.xmin) * 0.1
+        ax.set_xlim(self.xmin - bx, self.xmax + bx)
+        ax.set_ylim(self.ymin - by, self.ymax + by)
+        ax.grid(zorder=-1, color="#323232")
+        ax.set_aspect('equal')
 
-# 10x<
-
-# (2x;r4>l) > (r4;2x>l)
-
-# > (vl) 3x> (vl) 3:[>] (vl) [3:>] (vl)
-
-# """)
-
-# points = plotter.gen_path("""v[>]vs""")
-#
+        plt.tight_layout()
+        plt.show()
 
 
-t0 = time.time()
-# points = plotter.gen_path("""8y 13x >v|4z
-# (3:1r3;6$tri!)
-# ]
-# $tri$1=>l(1r3;1z2;3:1r3[$1?$1-1$tri!])>l
-# """)
-points = plotter.gen_path("""10y;10x>^|4z;3r4
-0.2z6
+def dragon_animation():
+    plot = Plot()
 
-1:1r4;(M11$dra!)]
-1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
-1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
+    dragon = plot.compile("""
+        M $dra!L
+
+        ]
+
+        1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
+        1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
+
+        1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
+    """)
+
+    plot.run(dragon, 10)
+    plot.show()
+
+    codes, verts = plot.get_path()
+
+    fig, ax = plt.subplots(figsize=(8, 6), dpi=100)
+    pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
+
+    patch = ax.add_patch(pp1)
+    # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
+
+    ax.set_aspect('equal')
 
 
-1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
-""")
-print(f"time: {time.time() - t0:.2f} points: {len(points[0])}")
-plot_path(*points)
+    by = (plot.ymax - plot.ymin) * 0.1
+    bx = (plot.xmax - plot.xmin) * 0.1
+    xlims = (plot.xmin - bx, plot.xmax + bx)
+    ylims = (plot.ymin - by, plot.ymax + by)
+    ax.set_xlim(*xlims)
+    ax.set_ylim(*ylims)
+
+
+    plt.axis('off')
+    plt.tight_layout()
+
+
+    def animate(i):
+        print(f"animate {i}")
+
+        if i < 15:
+            plot.run(dragon, i)
+
+        by = (plot.ymax - plot.ymin) * 0.1
+        bx = (plot.xmax - plot.xmin) * 0.1
+        xlims = (plot.xmin - bx, plot.xmax + bx)
+        ylims = (plot.ymin - by, plot.ymax + by)
+        ax.set_xlim(*xlims)
+        ax.set_ylim(*ylims)
+
+        codes, verts = plot.get_path()
+        patch.set_path(Path(verts, codes))
+        return patch,
+
+
+    ani = animation.FuncAnimation(
+        fig, animate, interval=500, blit=False, frames=range(1,20), repeat=False)
+    # ani.save("dragon.gif")
+    plt.show()
+
+
+dragon_animation()
