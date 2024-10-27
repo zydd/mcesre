@@ -226,7 +226,6 @@ class Plot:
     def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
         # #print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
-        start = ip
 
         def _args(n):
             assert len(state.stack) >= n
@@ -257,7 +256,7 @@ class Plot:
                 continue
 
             match prog[ip]:
-                case ";" | "i":
+                case ";":
                     pass
 
                 case " ":
@@ -336,6 +335,37 @@ class Plot:
                         self.points.append((Path.CURVE4, state.pos))
 
                     state.path.clear()
+
+                case "S":
+                    begin = 0
+                    while self.points[begin - 1][0] == Path.LINETO:
+                        begin -= 1
+
+                    # Need at least 2 line segments to make a spline
+                    if -begin >= 2:
+                        curve = self.points[begin:]
+                        self.points = self.points[:begin]
+
+                        v1 = curve[0][1] - self.points[-1][1]
+                        v2 = curve[1][1] - curve[0][1]
+                        v = v1 + v2
+
+                        self.points.append((Path.CURVE3, curve[0][1] - 0.25 * v))
+                        self.points.append((Path.CURVE3, curve[0][1]))
+
+                        for i in range(1, len(curve)-1):
+                            self.points.append((Path.CURVE4, curve[i-1][1] + 0.25 * v))
+                            v1 = v2
+                            v2 = curve[i+1][1] - curve[i][1]
+                            v = v1 + v2
+                            self.points.append((Path.CURVE4, curve[i][1] - 0.25 * v))
+                            self.points.append((Path.CURVE4, curve[i][1]))
+
+
+                        self.points.append((Path.CURVE3, curve[-2][1] + 0.25 * v))
+                        self.points.append((Path.CURVE3, curve[-1][1]))
+
+
 
                 case "c":
                     state.curv = _args(2)
@@ -461,7 +491,7 @@ points = plotter.gen_path("""10y;10x>^|4z;3r4
 1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
 
 
-1$zdra=[$1?1r8$1-1$zdra!|7r8$1-1$zdra!b 1z4;1r8> L >>[>v]vvl v]
+1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
 """)
 print(f"time: {time.time() - t0:.2f} points: {len(points[0])}")
 plot_path(*points)
