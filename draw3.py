@@ -133,6 +133,7 @@ class Plot:
         self.reset()
 
     def reset(self, reset_pos=True):
+        self.mem = dict()
         self.state = State()
 
         self.points = [(Path.MOVETO, self.state.pos)]
@@ -141,7 +142,6 @@ class Plot:
         self.xmax = float('-inf')
         self.ymin = float('inf')
         self.ymax = float('-inf')
-
 
     def _condense_path(self, path):
         r = P(0, 0)
@@ -290,7 +290,7 @@ class Plot:
 
         return prog
 
-    def _exec(self, prog, state, single_statement=False, ip=1, itr=None, depth=0):
+    def _exec(self, prog, state, single_statement=False, ip=0, itr=None, depth=0):
         # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
 
@@ -304,8 +304,6 @@ class Plot:
             #print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
 
             if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
-                if self.points[-1][0] == Path.MOVETO:
-                    self.points.pop()
                 self._add_point(Path.MOVETO, state.translate(self._condense_path(state.path)))
                 state.path.clear()
 
@@ -343,8 +341,6 @@ class Plot:
 
                 case "(":
                     _, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
-                    if self.points[-1][0] == Path.MOVETO:
-                        self.points.pop()
                     self._add_point(Path.MOVETO, state.pos)
 
                 case ")":
@@ -365,12 +361,11 @@ class Plot:
                     state.path.clear()
 
                 case "M":
-                    self._add_point(Path.MOVETO, self.points[-1][1])
+                    self._add_point("M", self.points[-1][1])
 
                 case "L":
-                    if len(self.points) > 1 and self.points[-1][0] == Path.MOVETO:
-                        self.points.pop()
-                        self._add_point(Path.LINETO, state.pos)
+                    if self.points[-1][0] == Path.MOVETO:
+                        self._add_point("L", state.pos)
 
                 case "s":
                     if type(prog[ip-1]) in [int, float]:
@@ -458,7 +453,29 @@ class Plot:
 
                 case "!":
                     addr, argc = _args(2)
-                    state, _ = self._exec(prog, state=state, single_statement=True, ip=addr, depth=depth+1)
+                    key = (addr, tuple(state.stack[len(state.stack)-argc:]))
+
+                    if self.mem is not None and key in self.mem:
+                        tra, dpos, points = self.mem[key]
+
+                        for c, p in points:
+                            self._add_point(c, state.pos + state.transform(p))
+
+                        state.pos = state.pos + state.transform(dpos)
+                        state.transformation_matrix = state.transformation_matrix @ tra
+                    else:
+                        p0 = len(self.points)
+                        tra0 = np.linalg.inv(state.transformation_matrix)
+                        pos0 = state.pos
+
+                        state, _ = self._exec(prog, state=state, single_statement=True, ip=addr, depth=depth+1)
+
+                        if self.mem is not None:
+                            tra = state.transformation_matrix @ tra0
+                            points = [(c, tra0 @ (p - pos0)) for c, p in self.points[p0:]]
+                            dpos = tra0 @ (state.pos - pos0)
+
+                            self.mem[key] = (tra, dpos, points)
 
                     state.stack = state.stack[:-argc]
 
@@ -485,23 +502,51 @@ class Plot:
         print(*prog)
         return prog
 
-    def run(self, prog, *args):
+    def run(self, prog, *args, nomem=False):
         t0 = time.time()
 
         self.reset()
         self.state.stack = list(args)
+
+        if nomem:
+            self.mem = None
         self._exec(prog, self.state)
 
-        print(f"time: {time.time() - t0:.2f} points: {len(self.points)}")
+        del self.mem
+
+        print(f"run time: {time.time() - t0:.2f} points: {len(self.points)}")
 
     def run_code(self, code):
         self.run(self.compile(code))
 
     def get_path(self):
-        return list(zip(*self.points))
+        t0 = time.time()
+        codes = []
+        verts = []
+        last_code = None
+        for c, p in self.points:
+            if c == "L":
+                codes[-1] = Path.LINETO
+                last_code = Path.LINETO
+            elif c == "M":
+                codes.append(Path.MOVETO)
+                verts.append(verts[-1])
+                last_code = Path.MOVETO
+
+            elif c == Path.MOVETO and last_code == Path.MOVETO:
+                verts[-1] = p
+            else:
+                last_code = c
+                codes.append(c)
+                verts.append(p)
+        # codes, verts = list(zip(*self.points))
+        print(f"gen time: {time.time() - t0:.2f} points: {len(codes)}")
+        return codes, verts
 
     def show(self):
         codes, verts = self.get_path()
+
+        t0 = time.time()
 
         fig, ax = plt.subplots(figsize=(8, 6))
         pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
@@ -517,6 +562,8 @@ class Plot:
         ax.set_aspect('equal')
 
         plt.tight_layout()
+
+        print(f"plt time: {time.time() - t0:.2f}")
         plt.show()
 
 
@@ -557,18 +604,16 @@ def dragon_animation():
             patch.set_path(Path(verts, codes))
         return patch,
 
-
     ani = animation.FuncAnimation(
         fig, animate, interval=500, blit=False, frames=range(1,20), repeat=False)
     # ani.save("dragon.gif")
     plt.show()
 
-
-
 plot = Plot()
 
-dragon = plot.compile("""1+1-1+1-1+1-1r1
-    M $dra!L
+dragon = plot.compile(
+    """
+    4:(M$1$dra!L)1r4
 
     ]
 
@@ -578,7 +623,7 @@ dragon = plot.compile("""1+1-1+1-1+1-1r1
     1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
 """)
 
-plot.run(dragon, 13)
+plot.run(dragon, 14)
 plot.show()
 
 # dragon_animation()
