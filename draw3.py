@@ -16,12 +16,7 @@ Path = mpath.Path
 
 phi = (1 + 5**0.5)*0.5
 
-
-
-
-
 P = lambda x, y: np.array([x, y], dtype="double")
-
 
 class State:
     def __init__(self):
@@ -166,7 +161,13 @@ class Plot:
         i = 0
 
         while i < len(prog):
-            if num := re.match(r"^\d*\.?\d+(e[+-]?\d+)?", prog[i:]):
+            if ident := re.match(r"^#.*\n", prog[i:]):
+                if tokens[-1] != " ":
+                    tokens.append(" ")
+
+                i += ident.end()
+
+            elif num := re.match(r"^\d*\.?\d+(e[+-]?\d+)?", prog[i:]):
                 i += num.end()
                 num = num[0]
                 if "." in num or "e" in num:
@@ -184,7 +185,8 @@ class Plot:
                 i += ident.end()
 
             elif space := re.match(r"^\s+", prog[i:]):
-                tokens.append(" ")
+                if tokens[-1] != " ":
+                    tokens.append(" ")
                 i += space.end()
 
             elif prog[i] == ",":
@@ -311,7 +313,6 @@ class Plot:
                 state.stack.append(prog[ip])
                 ip += 1
                 continue
-
 
             match prog[ip]:
                 case ";":
@@ -452,9 +453,7 @@ class Plot:
                 case ":":
                     start = ip + 1
                     for n in range(*_args(1)):
-                        ##print(f"loop {n}")
                         state, ip = self._exec(prog, state=state, single_statement=True, ip=start, itr=n+1, depth=depth)
-                        ##print(f"loopd {n}")
                     ip -= 1
 
                 case "!":
@@ -579,7 +578,7 @@ dragon = plot.compile("""1+1-1+1-1+1-1r1
     1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
 """)
 
-plot.run(dragon, 14)
+plot.run(dragon, 13)
 plot.show()
 
 # dragon_animation()
