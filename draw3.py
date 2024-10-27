@@ -199,25 +199,37 @@ class Plot:
 
     def _preprocess(self, prog):
         functions = dict()
-        argc = dict()
         conditionals = list()
         references = list()
         calls = list()
-        i = 1
-        pop_num = False
-        while i < len(prog)-1:
-            #print(i, *prog)
-            if (    prog[i] in ["+", "-", "*", "/", "c"]
-                    and (type(prog[i+1]) in [int, float]
-                        or prog[i+1].startswith("$"))):
-                prog[i:i+2] = [prog[i+1], prog[i]]
-                i += 1
 
-            elif (  prog[i] in ["x", "y", "z", "r"]
-                    and (type(prog[i+1]) in [int, float]
-                        or prog[i+1].startswith("$"))):
-                prog[i:i+2] = [prog[i+1], "/", prog[i]]
-                i += 2
+        operations = {
+            "+": operator.add,
+            "-": operator.sub,
+            "*": operator.mul,
+            "/": operator.truediv,
+        }
+
+        i = 1
+        while i < len(prog)-1:
+            # print(f"{i:<3}: ", *prog)
+
+            if prog[i] in ["+", "-", "*", "/"]:
+                if type(prog[i+1]) in [int, float] and type(prog[i-1]) in [int, float]:
+                    prog[i-1] = operations[prog[i]](prog[i-1], prog[i+1])
+                    del prog[i:i+2]
+                    i -= 1
+                elif type(prog[i+1]) in [int, float] or prog[i+1].startswith("$"):
+                    prog[i:i+2] = [prog[i+1], prog[i]]
+                    i += 1
+
+            elif prog[i] in ["x", "y", "z", "r"] and type(prog[i+1]) in [int, float]:
+                if type(prog[i-1]) in [int, float]:
+                    prog[i-1] /= prog[i+1]
+                    del prog[i+1]
+                else:
+                    prog[i:i+2] = [prog[i+1], "/", prog[i]]
+                    i += 2
 
             elif type(prog[i]) is str and prog[i].startswith("$"):
                 if prog[i][1:].isdigit():
@@ -510,22 +522,6 @@ class Plot:
 
 
 def dragon_animation():
-    plot = Plot()
-
-    dragon = plot.compile("""
-        M $dra!L
-
-        ]
-
-        1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
-        1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
-
-        1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
-    """)
-
-    plot.run(dragon, 12)
-    plot.show()
-
     codes, verts = plot.get_path()
 
     fig, ax = plt.subplots(figsize=(8, 6), dpi=100)
@@ -569,4 +565,21 @@ def dragon_animation():
     plt.show()
 
 
-dragon_animation()
+
+plot = Plot()
+
+dragon = plot.compile("""1+1-1+1-1+1-1r1
+    M $dra!L
+
+    ]
+
+    1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
+    1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
+
+    1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
+""")
+
+plot.run(dragon, 14)
+plot.show()
+
+# dragon_animation()
