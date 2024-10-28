@@ -13,6 +13,8 @@ import matplotlib.path as mpath
 plt.style.use("dark_background")
 
 Path = mpath.Path
+PATH_LINK_LAST = -1
+PATH_MOVE_CUR = -2
 
 phi = (1 + 5**0.5)*0.5
 
@@ -93,7 +95,8 @@ class Plot:
         self.mem = dict()
         self.state = State()
 
-        self.points = [(Path.MOVETO, self.state.pos)]
+        self.verts = [self.state.pos]
+        self.cmds = [Path.MOVETO]
 
         self.xmin = float('inf')
         self.xmax = float('-inf')
@@ -111,7 +114,8 @@ class Plot:
         self.xmax = max(self.xmax, point[0])
         self.ymin = min(self.ymin, point[1])
         self.ymax = max(self.ymax, point[1])
-        self.points.append((cmd, point))
+        self.verts.append(point)
+        self.cmds.append(cmd)
 
     def _tokenize(self, prog):
         tokens = [";"]
@@ -319,11 +323,11 @@ class Plot:
                     state.path.clear()
 
                 case "M":
-                    self._add_point("M", self.points[-1][1])
+                    self._add_point(PATH_MOVE_CUR, self.verts[-1])
 
                 case "L":
-                    if self.points[-1][0] == Path.MOVETO:
-                        self._add_point("L", state.pos)
+                    if self.cmds[-1] == Path.MOVETO:
+                        self._add_point(PATH_LINK_LAST, state.pos)
 
                 case "s":
                     if type(prog[ip-1]) in [int, float]:
@@ -420,15 +424,15 @@ class Plot:
                     key = (addr, tuple(state.stack[len(state.stack)-argc:]))
 
                     if self.mem is not None and key in self.mem:
-                        tra, dpos, points = self.mem[key]
+                        tra, dpos, verts, cmds = self.mem[key]
 
-                        for c, p in points:
+                        for c, p in zip(cmds, verts):
                             self._add_point(c, state.pos + state.transform(p))
 
                         state.pos = state.pos + state.transform(dpos)
                         state.transformation_matrix = state.transformation_matrix @ tra
                     else:
-                        p0 = len(self.points)
+                        p0 = len(self.verts)
                         tra0 = np.linalg.inv(state.transformation_matrix)
                         pos0 = state.pos
 
@@ -436,10 +440,10 @@ class Plot:
 
                         if self.mem is not None:
                             tra = state.transformation_matrix @ tra0
-                            points = [(c, tra0 @ (p - pos0)) for c, p in self.points[p0:]]
+                            verts = [tra0 @ (p - pos0) for p in self.verts[p0:]]
                             dpos = tra0 @ (state.pos - pos0)
 
-                            self.mem[key] = (tra, dpos, points)
+                            self.mem[key] = (tra, dpos, verts, self.cmds[p0:])
 
                     state.stack = state.stack[:-argc]
 
@@ -478,7 +482,7 @@ class Plot:
 
         del self.mem
 
-        print(f"run time: {time.time() - t0:.2f} points: {len(self.points)}")
+        print(f"run time: {time.time() - t0:.2f} points: {len(self.verts)}")
 
     def run_code(self, code):
         self.run(self.compile(code))
@@ -488,11 +492,11 @@ class Plot:
         codes = []
         verts = []
         last_code = None
-        for c, p in self.points:
-            if c == "L":
+        for c, p in zip(self.cmds, self.verts):
+            if c == PATH_LINK_LAST:
                 codes[-1] = Path.LINETO
                 last_code = Path.LINETO
-            elif c == "M":
+            elif c == PATH_MOVE_CUR:
                 codes.append(Path.MOVETO)
                 verts.append(verts[-1])
                 last_code = Path.MOVETO
