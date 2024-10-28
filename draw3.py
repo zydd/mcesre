@@ -455,7 +455,7 @@ class Plot:
 
                             self.mem[key] = (tra, dpos, verts, self.cmds[p0:], ret)
 
-                            del state.stack[arg0-argc:arg0]
+                        del state.stack[arg0-argc:arg0]
 
                 case "?":
                     cond, stmt_end = _args(2)
