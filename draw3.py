@@ -24,8 +24,6 @@ class State:
         self.path = []
         self.stack = []
         self.pos = P(0, 0)
-        self.rot = 0
-        self.scale = P(1, 1)
         self.transformation_matrix = np.array([
             [1, 0],
             [0, 1],
@@ -37,19 +35,9 @@ class State:
         return c
 
     def transform(self, p):
-        # p = np.array(p, dtype="double")
-        # p *= self.scale
-        # p += self.shear * list(reversed(p))
-        #
-        # if self.rot != 1:
-        #     cos = np.cos(self.rot * 2 * np.pi)
-        #     sin = np.sin(self.rot * 2 * np.pi)
-        #     p = np.array((p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos), dtype='double')
-
         return self.transformation_matrix @ p
 
     def stretch_x(self, k):
-        self.scale[0] *= k
         mat = np.array([
             [k, 0],
             [0, 1],
@@ -58,7 +46,6 @@ class State:
         self.transformation_matrix = self.transformation_matrix @ mat
 
     def stretch_y(self, k):
-        self.scale[1] *= k
         mat = np.array([
             [1, 0],
             [0, k],
@@ -83,8 +70,7 @@ class State:
         self.transformation_matrix = self.transformation_matrix @ mat
 
     def rotate(self, a):
-        self.rot += a
-        a *= 2 * np.pi
+        a = 2 * a * np.pi
         cos = np.cos(a)
         sin = np.sin(a)
         mat = np.array([
@@ -97,35 +83,6 @@ class State:
     def translate(self, p):
         self.pos = self.pos + p
         return self.pos
-
-    def scale_prop(self, **kwargs):
-        keys = dict(
-            x=(float, "scale", 0),
-            y=(float, "scale", 1),
-            c1=(float, "curv", 0),
-            c2=(float, "curv", 1),
-            r=(float, "rot", None)
-        )
-
-        ops = dict(
-            d=operator.truediv,
-            m=operator.mul,
-            a=operator.add,
-            s=operator.sub,
-        )
-
-        for k in kwargs:
-            if kwargs[k] == "" or kwargs[k] is None:
-                continue
-
-            op = ops[k[0]]
-
-            typ, name, idx = keys[k[1:]]
-
-            if idx is not None:
-                getattr(self, name)[idx] = op(getattr(self, name)[idx], typ(kwargs[k]))
-            else:
-                setattr(self, name, op(getattr(self, name), typ(kwargs[k])))
 
 
 class Plot:
