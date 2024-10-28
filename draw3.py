@@ -98,11 +98,6 @@ class Plot:
         self.verts = [self.state.pos]
         self.cmds = [Path.MOVETO]
 
-        self.xmin = float('inf')
-        self.xmax = float('-inf')
-        self.ymin = float('inf')
-        self.ymax = float('-inf')
-
     def _condense_path(self, path):
         r = P(0, 0)
         for p in path:
@@ -110,10 +105,6 @@ class Plot:
         return r
 
     def _add_point(self, cmd, point):
-        self.xmin = min(self.xmin, point[0])
-        self.xmax = max(self.xmax, point[0])
-        self.ymin = min(self.ymin, point[1])
-        self.ymax = max(self.ymax, point[1])
         self.verts.append(point)
         self.cmds.append(cmd)
 
@@ -263,7 +254,7 @@ class Plot:
             return args
 
         while ip < len(prog)-1:
-            print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
+            # print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
 
             if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
                 self._add_point(Path.MOVETO, state.translate(self._condense_path(state.path)))
@@ -427,8 +418,16 @@ class Plot:
                     if self.mem is not None and key in self.mem:
                         tra, dpos, verts, cmds, ret = self.mem[key]
 
-                        for c, p in zip(cmds, verts):
-                            self._add_point(c, state.pos + state.transform(p))
+                        # for c, p in zip(cmds, verts):
+                        #     self._add_point(c, state.pos + state.transform(p))
+
+                        if len(verts):
+                            verts = state.transformation_matrix @ verts
+                            verts[0,:] += state.pos[0]
+                            verts[1,:] += state.pos[1]
+
+                        self.cmds.extend(cmds)
+                        self.verts.extend(verts.T)
 
                         state.pos = state.pos + state.transform(dpos)
                         state.transformation_matrix = state.transformation_matrix @ tra
@@ -444,7 +443,13 @@ class Plot:
 
                         if self.mem is not None:
                             tra = state.transformation_matrix @ tra0
-                            verts = [tra0 @ (p - pos0) for p in self.verts[p0:]]
+                            # verts = [tra0 @ (p - pos0) for p in self.verts[p0:]]
+                            verts = np.array(self.verts[p0:], dtype="double")
+                            if len(verts):
+                                verts[:,0] -= pos0[0]
+                                verts[:,1] -= pos0[1]
+                                verts = tra0 @ verts.T
+
                             dpos = tra0 @ (state.pos - pos0)
                             ret = state.stack[arg0:]
 
@@ -475,13 +480,13 @@ class Plot:
         print(*prog)
         return prog
 
-    def run(self, prog, *args, nomem=False):
+    def run(self, prog, *args, memoize=True):
         t0 = time.time()
 
         self.reset()
         self.state.stack = list(args)
 
-        if nomem:
+        if not memoize:
             self.mem = None
         self._exec(prog, self.state)
 
@@ -489,8 +494,8 @@ class Plot:
 
         print(f"run time: {time.time() - t0:.2f} points: {len(self.verts)}")
 
-    def run_code(self, code):
-        self.run(self.compile(code))
+    def run_code(self, code, *args, **kwargs):
+        return self.run(self.compile(code), *args, **kwargs)
 
     def get_path(self):
         t0 = time.time()
@@ -531,10 +536,14 @@ class Plot:
         ax.add_patch(pp1)
         # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
 
-        by = (self.ymax - self.ymin) * 0.1
-        bx = (self.xmax - self.xmin) * 0.1
-        ax.set_xlim(self.xmin - bx, self.xmax + bx)
-        ax.set_ylim(self.ymin - by, self.ymax + by)
+        xmin = verts[:,0].min()
+        xmax = verts[:,0].max()
+        ymin = verts[:,1].min()
+        ymax = verts[:,1].max()
+        by = (ymax - ymin) * 0.1
+        bx = (xmax - xmin) * 0.1
+        ax.set_xlim(xmin - bx, xmax + bx)
+        ax.set_ylim(ymin - by, ymax + by)
         ax.grid(zorder=-1, color="#323232")
         ax.set_aspect('equal')
 
@@ -556,10 +565,14 @@ def dragon_animation(prog, itr, size=(8, 6), filename=None):
 
     ax.set_aspect('equal')
 
-    by = (plot.ymax - plot.ymin) * 0.1
-    bx = (plot.xmax - plot.xmin) * 0.1
-    xlims = (plot.xmin - bx, plot.xmax + bx)
-    ylims = (plot.ymin - by, plot.ymax + by)
+    xmin = verts[:,0].min()
+    xmax = verts[:,0].max()
+    ymin = verts[:,1].min()
+    ymax = verts[:,1].max()
+    by = (ymax - ymin) * 0.1
+    bx = (xmax - xmin) * 0.1
+    xlims = (xmin - bx, xmax + bx)
+    ylims = (ymin - by, ymax + by)
     ax.set_xlim(*xlims)
     ax.set_ylim(*ylims)
 
@@ -571,10 +584,10 @@ def dragon_animation(prog, itr, size=(8, 6), filename=None):
             print(f"animate {i:2} ", end="")
             plot.run(prog, i)
 
-            by = (plot.ymax - plot.ymin) * 0.1
-            bx = (plot.xmax - plot.xmin) * 0.1
-            xlims = (plot.xmin - bx, plot.xmax + bx)
-            ylims = (plot.ymin - by, plot.ymax + by)
+            by = (ymax - ymin) * 0.1
+            bx = (xmax - xmin) * 0.1
+            xlims = (xmin - bx, xmax + bx)
+            ylims = (ymin - by, ymax + by)
             ax.set_xlim(*xlims)
             ax.set_ylim(*ylims)
 
@@ -633,10 +646,10 @@ zcurve = plot.compile(
     1$len=2$1p*2-1
 """)
 
-plot.run(dragon, 15)
-# plot.run(hilbert, 5)
-# plot.run(gosper, 3)
-# plot.run(zcurve, 4)
+plot.run(dragon, 12)
+plot.run(hilbert, 8)
+plot.run(gosper, 5)
+plot.run(zcurve, 7)
 plot.show()
 
 # dragon_animation(hilbert, 8, size=(6,6), filename="hilbert.mp4")
