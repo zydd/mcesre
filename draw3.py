@@ -178,7 +178,7 @@ class Plot:
         while i < len(prog)-1:
             # print(f"{i:<3}: ", *prog)
 
-            if prog[i] in ["+", "-", "*", "/"]:
+            if prog[i] in ["+", "-", "*", "/", "p"]:
                 if type(prog[i+1]) in [int, float] and type(prog[i-1]) in [int, float]:
                     prog[i-1] = operations[prog[i]](prog[i-1], prog[i+1])
                     del prog[i:i+2]
@@ -263,7 +263,7 @@ class Plot:
             return args
 
         while ip < len(prog)-1:
-            # print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
+            print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
 
             if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
                 self._add_point(Path.MOVETO, state.translate(self._condense_path(state.path)))
@@ -422,15 +422,19 @@ class Plot:
                 case "!":
                     addr, argc = _args(2)
                     key = (addr, tuple(state.stack[len(state.stack)-argc:]))
+                    arg0 = len(state.stack)
 
                     if self.mem is not None and key in self.mem:
-                        tra, dpos, verts, cmds = self.mem[key]
+                        tra, dpos, verts, cmds, ret = self.mem[key]
 
                         for c, p in zip(cmds, verts):
                             self._add_point(c, state.pos + state.transform(p))
 
                         state.pos = state.pos + state.transform(dpos)
                         state.transformation_matrix = state.transformation_matrix @ tra
+
+                        del state.stack[arg0-argc:arg0]
+                        state.stack.extend(ret)
                     else:
                         p0 = len(self.verts)
                         tra0 = np.linalg.inv(state.transformation_matrix)
@@ -442,10 +446,11 @@ class Plot:
                             tra = state.transformation_matrix @ tra0
                             verts = [tra0 @ (p - pos0) for p in self.verts[p0:]]
                             dpos = tra0 @ (state.pos - pos0)
+                            ret = state.stack[arg0:]
 
-                            self.mem[key] = (tra, dpos, verts, self.cmds[p0:])
+                            self.mem[key] = (tra, dpos, verts, self.cmds[p0:], ret)
 
-                    state.stack = state.stack[:-argc]
+                            del state.stack[arg0-argc:arg0]
 
                 case "?":
                     cond, stmt_end = _args(2)
@@ -504,7 +509,7 @@ class Plot:
         verts[1:][move_curs[1:]] = verts[:-1][move_curs[:-1]]
 
         links = (codes == PATH_LINK_LAST)
-        codes[:-1][links[1:]] = Path.LINETO
+        codes[1:-1][links[2:]] = Path.LINETO
 
         nlinks = np.logical_not(links)
         codes = codes[nlinks]
@@ -539,10 +544,11 @@ class Plot:
         plt.show()
 
 
-def dragon_animation():
+def dragon_animation(prog, itr, size=(8, 6), filename=None):
+    plot.run(prog, 0)
     codes, verts = plot.get_path()
 
-    fig, ax = plt.subplots(figsize=(8, 6), dpi=100)
+    fig, ax = plt.subplots(figsize=size, dpi=100)
     pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
 
     patch = ax.add_patch(pp1)
@@ -561,9 +567,9 @@ def dragon_animation():
     plt.tight_layout()
 
     def animate(i):
-        if i < 15:
+        if i < itr:
             print(f"animate {i:2} ", end="")
-            plot.run(dragon, i)
+            plot.run(prog, i)
 
             by = (plot.ymax - plot.ymin) * 0.1
             bx = (plot.xmax - plot.xmin) * 0.1
@@ -577,8 +583,11 @@ def dragon_animation():
         return patch,
 
     ani = animation.FuncAnimation(
-        fig, animate, interval=500, blit=False, frames=range(1,20), repeat=False)
-    # ani.save("dragon.gif")
+        fig, animate, interval=2000, blit=False, frames=range(0,itr+3), repeat=False)
+
+    if filename:
+        ani.save(filename, dpi=200)
+
     plt.show()
 
 plot = Plot()
@@ -597,15 +606,37 @@ dragon = plot.compile(
 """)
 hilbert = plot.compile(
     """
-    1 2 1$1+p1-/z
-    $1$hil!
-    ]
-
+    1 2 1$1+p 1-/z
+    $1$hil!]
     1$hil=[$1?$1-1[3r4;0-1x$hil! | ^l $hil! | >l $hil! | vl 1r4;0-1x$hil!]b ^>vl]
 """)
+gosper = plot.compile(
+    """
+    $1$S!
+    ]
+    1$Z=[?$1-1[1r6 1z2 $1$Z! 5r6 $1$Z! 4r6 $1$1$Z!$Z! 2r6 $1$Z! 1r6 $1$Z!]b $z!]
+    0$z=[1r6 1z2 >l  5r6 >l  4r6 >>l    2r6 >l  1r6 >l ]
 
-# plot.run(dragon, 14)
-plot.run(hilbert, 5)
+    1$S=,[?$1-1[    $1$S! 1r6   $1$SI!      2r6 $1$SI!  5r6 $1$S!  4r6 $1$1$S!$S! 5r6 $1$SI!]b $s!]
+    1$SI=[?$1-1[5r6 $1$S! 1r6 $1$1$SI!$SI!  2r6 $1$SI!  1r6 $1$S!  4r6   $1$S!    5r6 $1$SI!]b $si!]
+    0$s=,[2z5     >l 1r6  >l  2r6 >l  5r6 >l  4r6 >>l  5r6 >l]
+    0$si=[2z5 5r6 >l 1r6 >>l  2r6 >l  1r6 >l  4r6 >l   5r6 >l]
+    ]
+""")
+
+zcurve = plot.compile(
+    """
+    $1$z! [$1$len!y>^] $1$z! (1r8 4:(>l)1r4)]
+
+    1$z=[$1?[$1-1[L $1$z! [$1$len! y>^] L $1$z! [$2$len! x<] [v] L $1$z! [$1$len! y>^] L $1$z! ]b] >[<v]>l]
+
+    1$len=2$1p*2-1
+""")
+
+plot.run(dragon, 15)
+# plot.run(hilbert, 5)
+# plot.run(gosper, 3)
+# plot.run(zcurve, 4)
 plot.show()
 
-# dragon_animation()
+# dragon_animation(hilbert, 8, size=(6,6), filename="hilbert.mp4")
