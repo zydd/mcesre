@@ -489,25 +489,29 @@ class Plot:
 
     def get_path(self):
         t0 = time.time()
-        codes = []
-        verts = []
-        last_code = None
-        for c, p in zip(self.cmds, self.verts):
-            if c == PATH_LINK_LAST:
-                codes[-1] = Path.LINETO
-                last_code = Path.LINETO
-            elif c == PATH_MOVE_CUR:
-                codes.append(Path.MOVETO)
-                verts.append(verts[-1])
-                last_code = Path.MOVETO
+        codes = np.array(self.cmds, dtype="int")
+        verts = np.array(self.verts, dtype="double")
 
-            elif c == Path.MOVETO and last_code == Path.MOVETO:
-                verts[-1] = p
-            else:
-                last_code = c
-                codes.append(c)
-                verts.append(p)
-        # codes, verts = list(zip(*self.points))
+        # Only keep last of consecutive moves
+        moves = np.hstack((codes != Path.MOVETO, [True]))
+        d = (np.diff(moves.astype("int")) == 1)
+        moves = np.logical_or(moves[:-1], d)
+        codes = codes[moves]
+        verts = verts[moves]
+
+        move_curs = (codes == PATH_MOVE_CUR)
+        codes[move_curs] = Path.MOVETO
+        verts[1:][move_curs[1:]] = verts[:-1][move_curs[:-1]]
+
+        links = (codes == PATH_LINK_LAST)
+        codes[:-1][links[1:]] = Path.LINETO
+
+        nlinks = np.logical_not(links)
+        codes = codes[nlinks]
+        verts = verts[nlinks]
+
+        assert len(codes) == len(verts)
+
         print(f"gen time: {time.time() - t0:.2f} points: {len(codes)}")
         return codes, verts
 
@@ -581,7 +585,7 @@ plot = Plot()
 
 dragon = plot.compile(
     """
-    1:(M$1$dra!L)1r4
+    4:(M $1$dra! L)1r4
 
     ]
 
