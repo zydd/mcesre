@@ -87,28 +87,247 @@ class State:
         return self.pos
 
 
-class Plot:
-    def __init__(self):
-        self.reset()
-
-    def reset(self, reset_pos=True):
+class Program:
+    def __init__(self, prog, functions):
         self.mem = dict()
-        self.state = State()
+        self.prog = prog
+        self.functions = functions
 
-        self.verts = [self.state.pos]
-        self.cmds = [Path.MOVETO]
+    def _exec(self, plot, state, single_statement=False, ip=0):
+        # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
+        initial_state = state.clone()
 
-    def _condense_path(self, path):
-        r = P(0, 0)
-        for p in path:
-            r += p
-        return r
+        def _args(n):
+            assert len(state.stack) >= n
+            args = state.stack[-n:]
+            state.stack = state.stack[:-n]
+            return args
 
-    def _add_point(self, cmd, point):
-        self.verts.append(point)
-        self.cmds.append(cmd)
+        while ip < len(self.prog)-1:
+            # print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
 
-    def _tokenize(self, prog):
+            if state.path and self.prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
+                plot.add_point(Path.MOVETO, state.translate(plot.condense_path(state.path)))
+                state.path.clear()
+
+            if type(self.prog[ip]) in [int, float]:
+                state.stack.append(self.prog[ip])
+                ip += 1
+                continue
+
+            match self.prog[ip]:
+                case ";":
+                    pass
+
+                case " " | "\n":
+                    if single_statement:
+                        break
+
+                case "$":
+                    arg, = _args(1)
+                    state.stack.append(initial_state.stack[-arg])
+
+                case "|":
+                    pos = state.pos
+                    state = initial_state.clone()
+                    state.pos = pos
+
+                case "[":
+                    st, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
+                    if st.path:
+                        state.path.append(plot.condense_path(st.path))
+
+                    state.pos = st.pos
+
+                case "]":
+                    break
+
+                case "(":
+                    _, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
+                    plot.add_point(Path.MOVETO, state.pos)
+
+                case ")":
+                    break
+
+                case "^":
+                    state.path.append(state.transform((0, 1)))
+                case ">":
+                    state.path.append(state.transform((1, 0)))
+                case "v":
+                    state.path.append(state.transform((0, -1)))
+                case "<":
+                    state.path.append(state.transform((-1, 0)))
+
+                case "l":
+                    for p in state.path:
+                        plot.add_point(Path.LINETO, state.translate(p))
+                    state.path.clear()
+
+                case "M":
+                    plot.add_point(PATH_MOVE_CUR, plot.verts[-1])
+
+                case "L":
+                    if plot.cmds[-1] == Path.MOVETO:
+                        plot.add_point(PATH_LINK_LAST, state.pos)
+
+                case "s":
+                    if type(self.prog[ip-1]) in [int, float]:
+                        if ip >= 2 and type(self.prog[ip-2]) in [int, float]:
+                            state.curv[0] = self.prog[ip-2]
+                            state.curv[1] = self.prog[ip-1]
+                        else:
+                            state.curv[1] = state.curv[0] = self.prog[ip-1]
+
+                    assert len(state.path) >= 3, state.path
+                    assert len(state.path) % 2 == 1, state.path
+
+                    v2 = state.path.pop(0)
+
+                    while len(state.path) >= 2:
+                        v1 = v2
+                        p = state.path[0]
+                        v2 = state.path[1]
+                        state.path = state.path[2:]
+
+                        plot.add_point(Path.CURVE4, state.pos + v1 * state.curv[0])
+                        state.pos = state.pos + p
+                        plot.add_point(Path.CURVE4, state.pos - v2 * state.curv[1])
+
+                        plot.add_point(Path.CURVE4, state.pos)
+
+                    state.path.clear()
+
+                case "S":
+                    begin = 0
+                    while self.points[begin - 1][0] == Path.LINETO:
+                        begin -= 1
+
+                    # Need at least 2 line segments to make a spline
+                    if -begin >= 2:
+                        curve = self.points[begin:]
+                        self.points = self.points[:begin]
+
+                        v1 = curve[0][1] - self.points[-1][1]
+                        v2 = curve[1][1] - curve[0][1]
+                        v = v1 + v2
+
+                        plot.add_point(Path.CURVE3, curve[0][1] - 0.25 * v)
+                        plot.add_point(Path.CURVE3, curve[0][1])
+
+                        for i in range(1, len(curve)-1):
+                            plot.add_point(Path.CURVE4, curve[i-1][1] + 0.25 * v)
+                            v1 = v2
+                            v2 = curve[i+1][1] - curve[i][1]
+                            v = v1 + v2
+                            plot.add_point(Path.CURVE4, curve[i][1] - 0.25 * v)
+                            plot.add_point(Path.CURVE4, curve[i][1])
+
+
+                        plot.add_point(Path.CURVE3, curve[-2][1] + 0.25 * v)
+                        plot.add_point(Path.CURVE3, curve[-1][1])
+
+                case "c":
+                    state.curv = _args(2)
+                case "x":
+                    state.stretch_x(_args(1)[0])
+                case "y":
+                    state.stretch_y(_args(1)[0])
+                case "z":
+                    v, = _args(1)
+                    state.stretch_x(v)
+                    state.stretch_y(v)
+                case "r":
+                    state.rotate(_args(1)[0])
+                case "+":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs + rhs)
+                case "-":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs - rhs)
+                case "*":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs * rhs)
+                case "/":
+                    num, den = _args(2)
+                    state.stack.append(num/den)
+                case "p":
+                    base, exp = _args(2)
+                    state.stack.append(base ** exp)
+
+                case ":":
+                    start = ip + 1
+                    for n in range(*_args(1)):
+                        state, ip = self._exec(plot, state=state, single_statement=True, ip=start)
+                    ip -= 1
+
+                case "!":
+                    addr, argc = _args(2)
+                    key = (addr, tuple(state.stack[len(state.stack)-argc:]))
+                    arg0 = len(state.stack)
+
+                    if self.mem is not None and key in self.mem:
+                        tra, dpos, verts, cmds, ret = self.mem[key]
+
+                        # for c, p in zip(cmds, verts):
+                        #     plot.add_point(c, state.pos + state.transform(p))
+
+                        if len(verts):
+                            verts = state.transformation_matrix @ verts
+                            verts[0,:] += state.pos[0]
+                            verts[1,:] += state.pos[1]
+
+                        plot.cmds.extend(cmds)
+                        plot.verts.extend(verts.T)
+
+                        state.pos = state.pos + state.transform(dpos)
+                        state.transformation_matrix = state.transformation_matrix @ tra
+
+                        del state.stack[arg0-argc:arg0]
+                        state.stack.extend(ret)
+                    else:
+                        p0 = len(plot.verts)
+                        tra0 = np.linalg.inv(state.transformation_matrix)
+                        pos0 = state.pos
+
+                        state, _ = self._exec(plot, state=state, single_statement=True, ip=addr)
+
+                        if self.mem is not None:
+                            tra = state.transformation_matrix @ tra0
+                            # verts = [tra0 @ (p - pos0) for p in plot.verts[p0:]]
+                            verts = np.array(plot.verts[p0:], dtype="double")
+                            if len(verts):
+                                verts[:,0] -= pos0[0]
+                                verts[:,1] -= pos0[1]
+                                verts = tra0 @ verts.T
+
+                            dpos = tra0 @ (state.pos - pos0)
+                            ret = state.stack[arg0:]
+
+                            self.mem[key] = (tra, dpos, verts, plot.cmds[p0:], ret)
+
+                        del state.stack[arg0-argc:arg0]
+
+                case "?":
+                    cond, stmt_end = _args(2)
+
+                    if not cond:
+                        ip = stmt_end - 1
+
+                case "b":
+                    break
+
+                case _:
+                    assert False, self.prog[ip]
+
+            ip += 1
+
+        #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
+        return state, ip
+
+
+class Compiler:
+    @staticmethod
+    def _tokenize(prog):
         tokens = [";"]
         i = 0
 
@@ -136,6 +355,10 @@ class Plot:
                 tokens.append(ident[0])
                 i += ident.end()
 
+            elif prog[i] == "\n":
+                tokens.append("\n")
+                i += 1
+
             elif space := re.match(r"^\s+", prog[i:]):
                 if tokens[-1] != " ":
                     tokens.append(" ")
@@ -151,7 +374,8 @@ class Plot:
 
         return tokens
 
-    def _preprocess(self, prog):
+    @staticmethod
+    def _preprocess(prog):
         functions = dict()
         conditionals = list()
         references = list()
@@ -241,261 +465,61 @@ class Plot:
             if fninfo:
                 prog[i] = fninfo[0]
 
-        return prog
+        return prog, functions
 
-    def _exec(self, prog, state, single_statement=False, ip=0, itr=None, depth=0):
-        # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
-        initial_state = state.clone()
-
-        def _args(n):
-            assert len(state.stack) >= n
-            args = state.stack[-n:]
-            state.stack = state.stack[:-n]
-            return args
-
-        while ip < len(prog)-1:
-            # print(f"{prog[ip]:<4} {ip} {depth}  {state.pos}  {state.stack}")
-
-            if state.path and prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
-                self._add_point(Path.MOVETO, state.translate(self._condense_path(state.path)))
-                state.path.clear()
-
-            if type(prog[ip]) in [int, float]:
-                state.stack.append(prog[ip])
-                ip += 1
-                continue
-
-            match prog[ip]:
-                case ";":
-                    pass
-
-                case " ":
-                    if single_statement:
-                        break
-
-                case "$":
-                    arg, = _args(1)
-                    state.stack.append(initial_state.stack[-arg])
-
-                case "|":
-                    pos = state.pos
-                    state = initial_state.clone()
-                    state.pos = pos
-
-                case "[":
-                    st, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
-                    if st.path:
-                        state.path.append(self._condense_path(st.path))
-
-                    state.pos = st.pos
-
-                case "]":
-                    break
-
-                case "(":
-                    _, ip = self._exec(prog, state=state.clone(), ip=ip + 1, itr=itr, depth=depth)
-                    self._add_point(Path.MOVETO, state.pos)
-
-                case ")":
-                    break
-
-                case "^":
-                    state.path.append(state.transform((0, 1)))
-                case ">":
-                    state.path.append(state.transform((1, 0)))
-                case "v":
-                    state.path.append(state.transform((0, -1)))
-                case "<":
-                    state.path.append(state.transform((-1, 0)))
-
-                case "l":
-                    for p in state.path:
-                        self._add_point(Path.LINETO, state.translate(p))
-                    state.path.clear()
-
-                case "M":
-                    self._add_point(PATH_MOVE_CUR, self.verts[-1])
-
-                case "L":
-                    if self.cmds[-1] == Path.MOVETO:
-                        self._add_point(PATH_LINK_LAST, state.pos)
-
-                case "s":
-                    if type(prog[ip-1]) in [int, float]:
-                        if ip >= 2 and type(prog[ip-2]) in [int, float]:
-                            state.curv[0] = prog[ip-2]
-                            state.curv[1] = prog[ip-1]
-                        else:
-                            state.curv[1] = state.curv[0] = prog[ip-1]
-
-                    assert len(state.path) >= 3, state.path
-                    assert len(state.path) % 2 == 1, state.path
-
-                    v2 = state.path.pop(0)
-
-                    while len(state.path) >= 2:
-                        v1 = v2
-                        p = state.path[0]
-                        v2 = state.path[1]
-                        state.path = state.path[2:]
-
-                        self._add_point(Path.CURVE4, state.pos + v1 * state.curv[0])
-                        state.pos = state.pos + p
-                        self._add_point(Path.CURVE4, state.pos - v2 * state.curv[1])
-
-                        self._add_point(Path.CURVE4, state.pos)
-
-                    state.path.clear()
-
-                case "S":
-                    begin = 0
-                    while self.points[begin - 1][0] == Path.LINETO:
-                        begin -= 1
-
-                    # Need at least 2 line segments to make a spline
-                    if -begin >= 2:
-                        curve = self.points[begin:]
-                        self.points = self.points[:begin]
-
-                        v1 = curve[0][1] - self.points[-1][1]
-                        v2 = curve[1][1] - curve[0][1]
-                        v = v1 + v2
-
-                        self._add_point(Path.CURVE3, curve[0][1] - 0.25 * v)
-                        self._add_point(Path.CURVE3, curve[0][1])
-
-                        for i in range(1, len(curve)-1):
-                            self._add_point(Path.CURVE4, curve[i-1][1] + 0.25 * v)
-                            v1 = v2
-                            v2 = curve[i+1][1] - curve[i][1]
-                            v = v1 + v2
-                            self._add_point(Path.CURVE4, curve[i][1] - 0.25 * v)
-                            self._add_point(Path.CURVE4, curve[i][1])
-
-
-                        self._add_point(Path.CURVE3, curve[-2][1] + 0.25 * v)
-                        self._add_point(Path.CURVE3, curve[-1][1])
-
-                case "c":
-                    state.curv = _args(2)
-                case "x":
-                    state.stretch_x(_args(1)[0])
-                case "y":
-                    state.stretch_y(_args(1)[0])
-                case "z":
-                    v, = _args(1)
-                    state.stretch_x(v)
-                    state.stretch_y(v)
-                case "r":
-                    state.rotate(_args(1)[0])
-                case "+":
-                    lhs, rhs = _args(2)
-                    state.stack.append(lhs + rhs)
-                case "-":
-                    lhs, rhs = _args(2)
-                    state.stack.append(lhs - rhs)
-                case "*":
-                    lhs, rhs = _args(2)
-                    state.stack.append(lhs * rhs)
-                case "/":
-                    num, den = _args(2)
-                    state.stack.append(num/den)
-                case "p":
-                    base, exp = _args(2)
-                    state.stack.append(base ** exp)
-
-                case ":":
-                    start = ip + 1
-                    for n in range(*_args(1)):
-                        state, ip = self._exec(prog, state=state, single_statement=True, ip=start, itr=n+1, depth=depth)
-                    ip -= 1
-
-                case "!":
-                    addr, argc = _args(2)
-                    key = (addr, tuple(state.stack[len(state.stack)-argc:]))
-                    arg0 = len(state.stack)
-
-                    if self.mem is not None and key in self.mem:
-                        tra, dpos, verts, cmds, ret = self.mem[key]
-
-                        # for c, p in zip(cmds, verts):
-                        #     self._add_point(c, state.pos + state.transform(p))
-
-                        if len(verts):
-                            verts = state.transformation_matrix @ verts
-                            verts[0,:] += state.pos[0]
-                            verts[1,:] += state.pos[1]
-
-                        self.cmds.extend(cmds)
-                        self.verts.extend(verts.T)
-
-                        state.pos = state.pos + state.transform(dpos)
-                        state.transformation_matrix = state.transformation_matrix @ tra
-
-                        del state.stack[arg0-argc:arg0]
-                        state.stack.extend(ret)
-                    else:
-                        p0 = len(self.verts)
-                        tra0 = np.linalg.inv(state.transformation_matrix)
-                        pos0 = state.pos
-
-                        state, _ = self._exec(prog, state=state, single_statement=True, ip=addr, depth=depth+1)
-
-                        if self.mem is not None:
-                            tra = state.transformation_matrix @ tra0
-                            # verts = [tra0 @ (p - pos0) for p in self.verts[p0:]]
-                            verts = np.array(self.verts[p0:], dtype="double")
-                            if len(verts):
-                                verts[:,0] -= pos0[0]
-                                verts[:,1] -= pos0[1]
-                                verts = tra0 @ verts.T
-
-                            dpos = tra0 @ (state.pos - pos0)
-                            ret = state.stack[arg0:]
-
-                            self.mem[key] = (tra, dpos, verts, self.cmds[p0:], ret)
-
-                        del state.stack[arg0-argc:arg0]
-
-                case "?":
-                    cond, stmt_end = _args(2)
-
-                    if not cond:
-                        ip = stmt_end - 1
-
-                case "b":
-                    break
-
-                case _:
-                    assert False, prog[ip]
-
-            ip += 1
-
-        #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
-        return state, ip
-
-    def compile(self, code):
-        tokens = self._tokenize(code)
-        prog = self._preprocess(tokens)
+    @staticmethod
+    def compile(code):
+        tokens = Compiler._tokenize(code)
+        prog, functions = Compiler._preprocess(tokens)
         print(*prog)
-        return prog
+        return Program(prog, functions)
+
+
+class Plot:
+    def __init__(self):
+        self.reset()
+
+    def reset(self, reset_pos=True):
+        self.state = State()
+
+        self.verts = [self.state.pos]
+        self.cmds = [Path.MOVETO]
+
+    def condense_path(self, path):
+        r = P(0, 0)
+        for p in path:
+            r += p
+        return r
+
+    def add_point(self, cmd, point):
+        self.verts.append(point)
+        self.cmds.append(cmd)
 
     def run(self, prog, *args, memoize=True):
         t0 = time.time()
 
+        ip = 0
+        if args and type(args[0]) is str:
+            ip, argc = prog.functions[args[0]]
+            args = args[1:]
+            assert len(args) == argc
+
         self.reset()
-        self.state.stack = list(args)
+        self.state.stack = list(reversed(args))
 
-        if not memoize:
-            self.mem = None
-        self._exec(prog, self.state)
+        # if not memoize:
+        #     self.mem = None
+        # elif memoize and not self.mem:
+        #     self.mem = dict()
 
-        del self.mem
+        prog._exec(self, self.state, ip=ip, single_statement=bool(ip))
 
         print(f"run time: {time.time() - t0:.2f} points: {len(self.verts)}")
 
-    def run_code(self, code, *args, **kwargs):
-        return self.run(self.compile(code), *args, **kwargs)
+        res = self.get_path()
+        # self.verts.clear()
+        # self.cmds.clear()
+        return res
 
     def get_path(self):
         t0 = time.time()
@@ -605,51 +629,116 @@ def dragon_animation(prog, itr, size=(8, 6), filename=None):
 
 plot = Plot()
 
-dragon = plot.compile(
+
+prog = Compiler.compile(
     """
-    4:(M $1$dra! L)1r4
-
-    ]
-
     1$dra=[$1?1r8$1-1$dra!|7r8$1-1$drai!b 1z4;1r8> L >>[>v]vvl v]
     1$drai=[$1?7r8$1-1$dra!|1r8$1-1$drai!b 1z4;1r8v L vv[v>]>>l >]
 
     1$zdra=[$1?1r8$1-1$zdra!|7r8;0-1y$1-1$zdra!b 1z4;1r8> L >>[>v]vvl v]
     1$ldra=[$1?1r8$1-1$ldra!|7r8$1-1$ldra!b 1z4;1r8> L >>[>v]vvl v]
-""")
-hilbert = plot.compile(
-    """
-    1 2 1$1+p 1-/z
-    $1$hil!]
+
+
     1$hil=[$1?$1-1[3r4;0-1x$hil! | ^l $hil! | >l $hil! | vl 1r4;0-1x$hil!]b ^>vl]
-""")
-gosper = plot.compile(
-    """
-    $1$S!
-    ]
-    1$Z=[?$1-1[1r6 1z2 $1$Z! 5r6 $1$Z! 4r6 $1$1$Z!$Z! 2r6 $1$Z! 1r6 $1$Z!]b $z!]
-    0$z=[1r6 1z2 >l  5r6 >l  4r6 >>l    2r6 >l  1r6 >l ]
 
-    1$S=,[?$1-1[    $1$S! 1r6   $1$SI!      2r6 $1$SI!  5r6 $1$S!  4r6 $1$1$S!$S! 5r6 $1$SI!]b $s!]
-    1$SI=[?$1-1[5r6 $1$S! 1r6 $1$1$SI!$SI!  2r6 $1$SI!  1r6 $1$S!  4r6   $1$S!    5r6 $1$SI!]b $si!]
-    0$s=,[2z5     >l 1r6  >l  2r6 >l  5r6 >l  4r6 >>l  5r6 >l]
-    0$si=[2z5 5r6 >l 1r6 >>l  2r6 >l  1r6 >l  4r6 >l   5r6 >l]
-    ]
-""")
+    # snowflake
+    1$goss=[?$1-1[1r6 1z2 $1$goss! 5r6 $1$goss! 4r6 $1$1$goss!$goss! 2r6 $1$goss! 1r6 $1$goss!]b $goss0!]
+    0$goss0=[1r6 1z2 >l  5r6 >l  4r6 >>l    2r6 >l  1r6 >l ]
 
-zcurve = plot.compile(
-    """
-    $1$z! [$1$len!y>^] $1$z! (1r8 4:(>l)1r4)]
+    # gos
+    1$gos=,[?$1-1[    $1$gos! 1r6   $1$gosi!      2r6 $1$gosi!  5r6 $1$gos!  4r6 $1$1$gos!$gos! 5r6 $1$gosi!]b $gos0!]
+    1$gosi=[?$1-1[5r6 $1$gos! 1r6 $1$1$gosi!$gosi!  2r6 $1$gosi!  1r6 $1$gos!  4r6   $1$gos!    5r6 $1$gosi!]b $gosi0!]
+    0$gos0=,[2z5     >l 1r6  >l  2r6 >l  5r6 >l  4r6 >>l  5r6 >l]
+    0$gosi0=[2z5 5r6 >l 1r6 >>l  2r6 >l  1r6 >l  4r6 >l   5r6 >l]
 
-    1$z=[$1?[$1-1[L $1$z! [$1$len! y>^] L $1$z! [$2$len! x<] [v] L $1$z! [$1$len! y>^] L $1$z! ]b] >[<v]>l]
+    # $1$z! [$1$len!y>^] $1$z! (1r8 4:(>l)1r4)]
 
+    1$z=[$1?[$1-1[$1$z! [$1$len! y>^] $1$z! [$2$len! x<] [v] $1$z! [$1$len! y>^] $1$z! ]b] L >[<v]>l]
     1$len=2$1p*2-1
-""")
+# """)
 
-plot.run(dragon, 12)
-plot.run(hilbert, 8)
-plot.run(gosper, 5)
-plot.run(zcurve, 7)
-plot.show()
+# plot.run(prog, "$dra", 12)
+# plot.run(prog, "$hil", 3)
+# plot.run(prog, "$gos", 1)
+# plot.run(prog, "$z", 6)
+# plot.show()
 
 # dragon_animation(hilbert, 8, size=(6,6), filename="hilbert.mp4")
+
+import tkinter
+
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+
+def tkplot(prog, func, *args):
+    plot.run(prog, func, 0, *args)
+    codes, verts = plot.get_path()
+
+    fig, ax = plt.subplots(figsize=(6,6), dpi=100)
+    pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
+
+    patch = ax.add_patch(pp1)
+    # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
+
+    ax.set_aspect('equal')
+
+    xmin = verts[:,0].min()
+    xmax = verts[:,0].max()
+    ymin = verts[:,1].min()
+    ymax = verts[:,1].max()
+    by = (ymax - ymin) * 0.1
+    bx = (xmax - xmin) * 0.1
+    xlims = (xmin - bx, xmax + bx)
+    ylims = (ymin - by, ymax + by)
+    ax.set_xlim(*xlims)
+    ax.set_ylim(*ylims)
+
+    plt.axis('off')
+    plt.tight_layout()
+
+    def _update_plot(*args):
+        itr = w2.get()
+
+        plot.run(prog, func, itr, *args)
+        codes, verts = plot.get_path()
+
+        t0 = time.time()
+
+        xmin = verts[:,0].min()
+        xmax = verts[:,0].max()
+        ymin = verts[:,1].min()
+        ymax = verts[:,1].max()
+        by = (ymax - ymin) * 0.1
+        bx = (xmax - xmin) * 0.1
+        xlims = (xmin - bx, xmax + bx)
+        ylims = (ymin - by, ymax + by)
+        ax.set_xlim(*xlims)
+        ax.set_ylim(*ylims)
+
+        codes, verts = plot.get_path()
+        if len(codes) > 500000:
+            codes = codes[:500000]
+            verts = verts[:500000]
+        patch.set_path(Path(verts, codes))
+        print(f"plt time: {time.time() - t0:.2f}")
+
+    return fig, _update_plot
+
+fig, update_plot = tkplot(prog, "$dra")
+
+def on_value_changed(*args):
+    update_plot()
+    canvas.draw()
+
+window = tkinter.Tk()
+
+window.protocol("WM_DELETE_WINDOW", window.quit)
+w2 = tkinter.Scale(window, from_=0, to=15, orient=tkinter.HORIZONTAL, command=on_value_changed, length=600)
+w2.set(5)
+w2.pack()
+
+canvas = FigureCanvasTkAgg(fig, window)
+canvas.get_tk_widget().pack()
+canvas.draw()
+
+tkinter.mainloop()
