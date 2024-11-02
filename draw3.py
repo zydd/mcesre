@@ -627,8 +627,6 @@ def dragon_animation(prog, itr, size=(8, 6), filename=None):
 
     plt.show()
 
-plot = Plot()
-
 
 prog = Compiler.compile(
     """
@@ -657,11 +655,12 @@ prog = Compiler.compile(
     1$len=2$1p*2-1
 # """)
 
+plot = Plot()
 # plot.run(prog, "$dra", 12)
 # plot.run(prog, "$hil", 3)
 # plot.run(prog, "$gos", 1)
-# plot.run(prog, "$z", 6)
-# plot.show()
+plot.run(prog, "$z", 6)
+plot.show()
 
 # dragon_animation(hilbert, 8, size=(6,6), filename="hilbert.mp4")
 
@@ -669,38 +668,56 @@ import tkinter
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
+class Gui:
+    def __init__(self, prog, func, args=()):
+        self.prog = prog
+        self.func = func
+        self.args = args
+        self.plot = Plot()
+        self._init_plot()
+        self._init_gui()
 
-def tkplot(prog, func, *args):
-    plot.run(prog, func, 0, *args)
-    codes, verts = plot.get_path()
+    def _init_plot(self):
+        fig, ax = plt.subplots(figsize=(8,6), dpi=100)
+        pp1 = mpatches.PathPatch(Path([(0, 0)], [Path.MOVETO]), zorder=2, fill=False)
 
-    fig, ax = plt.subplots(figsize=(6,6), dpi=100)
-    pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
+        patch = ax.add_patch(pp1)
+        # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
 
-    patch = ax.add_patch(pp1)
-    # ax.plot(*list(zip(*verts)), ".", zorder=1, color="#ff000040")
+        ax.set_aspect('equal')
 
-    ax.set_aspect('equal')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
 
-    xmin = verts[:,0].min()
-    xmax = verts[:,0].max()
-    ymin = verts[:,1].min()
-    ymax = verts[:,1].max()
-    by = (ymax - ymin) * 0.1
-    bx = (xmax - xmin) * 0.1
-    xlims = (xmin - bx, xmax + bx)
-    ylims = (ymin - by, ymax + by)
-    ax.set_xlim(*xlims)
-    ax.set_ylim(*ylims)
+        fig.tight_layout()
 
-    plt.axis('off')
-    plt.tight_layout()
+        self.ax = ax
+        self.fig = fig
+        self.patch = patch
 
-    def _update_plot(*args):
-        itr = w2.get()
+    def _redraw(self, *args):
+        t0 = time.time()
+        self._update_plot()
+        self.canvas.draw()
+        print(f"rdr time: {time.time() - t0:.2f}")
 
-        plot.run(prog, func, itr, *args)
-        codes, verts = plot.get_path()
+    def _init_gui(self):
+        self.window = tkinter.Tk()
+
+        self.window.protocol("WM_DELETE_WINDOW", self.window.quit)
+        self.w2 = tkinter.Scale(self.window, from_=0, to=15, orient=tkinter.HORIZONTAL, command=self._redraw, length=600)
+        self.w2.set(5)
+        self.w2.pack()
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self.window)
+        self.canvas.get_tk_widget().pack()
+        # self.canvas.draw()
+
+    def _update_plot(self):
+        itr = self.w2.get()
+
+        codes, verts = self.plot.run(prog, self.func, itr, *self.args)
 
         t0 = time.time()
 
@@ -712,33 +729,18 @@ def tkplot(prog, func, *args):
         bx = (xmax - xmin) * 0.1
         xlims = (xmin - bx, xmax + bx)
         ylims = (ymin - by, ymax + by)
-        ax.set_xlim(*xlims)
-        ax.set_ylim(*ylims)
+        self.ax.set_xlim(*xlims)
+        self.ax.set_ylim(*ylims)
 
-        codes, verts = plot.get_path()
         if len(codes) > 500000:
             codes = codes[:500000]
             verts = verts[:500000]
-        patch.set_path(Path(verts, codes))
-        print(f"plt time: {time.time() - t0:.2f}")
 
-    return fig, _update_plot
+        self.patch.set_path(Path(verts, codes))
+        print(f"upd time: {time.time() - t0:.2f}")
 
-fig, update_plot = tkplot(prog, "$dra")
+    def run(self):
+        return self.window.mainloop()
 
-def on_value_changed(*args):
-    update_plot()
-    canvas.draw()
-
-window = tkinter.Tk()
-
-window.protocol("WM_DELETE_WINDOW", window.quit)
-w2 = tkinter.Scale(window, from_=0, to=15, orient=tkinter.HORIZONTAL, command=on_value_changed, length=600)
-w2.set(5)
-w2.pack()
-
-canvas = FigureCanvasTkAgg(fig, window)
-canvas.get_tk_widget().pack()
-canvas.draw()
-
-tkinter.mainloop()
+gui = Gui(prog, "$dra")
+gui.run()
