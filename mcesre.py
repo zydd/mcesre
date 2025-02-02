@@ -23,7 +23,6 @@ P = lambda x, y: np.array([x, y], dtype="double")
 
 class State:
     def __init__(self):
-        self.curv = [1, 1]
         self.path = []
         self.stack = []
         self.pos = P(0, 0)
@@ -107,19 +106,12 @@ class Program:
         while ip < len(self.prog):
             # print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
 
-            if state.path and self.prog[ip] not in ["s", "l", "[", "]", ">", "v", "<", "^", "L", "M"]:
-                plot.add_point(Path.MOVETO, state.translate(plot.condense_path(state.path)))
-                state.path.clear()
-
             if type(self.prog[ip]) in [int, float]:
                 state.stack.append(self.prog[ip])
                 ip += 1
                 continue
 
             match self.prog[ip]:
-                case ";":
-                    pass
-
                 case " " | "\n":
                     if single_statement:
                         break
@@ -135,9 +127,6 @@ class Program:
 
                 case "[":
                     st, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
-                    if st.path:
-                        state.path.append(plot.condense_path(st.path))
-
                     state.pos = st.pos
 
                 case "]":
@@ -150,53 +139,55 @@ class Program:
                 case ")":
                     break
 
-                case "^":
-                    state.path.append(state.transform((0, 1)))
-                case ">":
-                    state.path.append(state.transform((1, 0)))
-                case "v":
-                    state.path.append(state.transform((0, -1)))
-                case "<":
-                    state.path.append(state.transform((-1, 0)))
+                case "{":
+                    p0 = len(plot.verts)
+                    st, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
+                    state.pos = st.pos
+                    pos = plot.verts[-1]
+                    plot.cmds = plot.cmds[:p0]
+                    plot.verts = plot.verts[:p0]
+                    plot.add_point(Path.MOVETO, pos)
 
-                case "l":
-                    for p in state.path:
-                        plot.add_point(Path.LINETO, state.translate(p))
-                    state.path.clear()
+                case "}":
+                    break
+
+                case ">":
+                    plot.add_point(Path.LINETO, state.translate(state.transform((1, 0))))
+
+                case "v":
+                    plot.add_point(Path.LINETO, state.translate(state.transform((0, -1))))
+
+                case "<":
+                    plot.add_point(Path.LINETO, state.translate(state.transform((-1, 0))))
+
+                case "^":
+                    plot.add_point(Path.LINETO, state.translate(state.transform((0, 1))))
+
+                case ";":
+                    plot.add_point(Path.MOVETO, state.translate(state.transform((1, 0))))
 
                 case "M":
                     plot.add_point(PATH_MOVE_CUR, plot.verts[-1])
 
-                case "L":
+                case "C":
                     if plot.cmds[-1] == Path.MOVETO:
                         plot.add_point(PATH_LINK_LAST, state.pos)
 
                 case "s":
-                    if type(self.prog[ip-1]) in [int, float]:
-                        if ip >= 2 and type(self.prog[ip-2]) in [int, float]:
-                            state.curv[0] = self.prog[ip-2]
-                            state.curv[1] = self.prog[ip-1]
-                        else:
-                            state.curv[1] = state.curv[0] = self.prog[ip-1]
+                    assert len(plot.verts) >= 4
 
-                    assert len(state.path) >= 3, state.path
-                    assert len(state.path) % 2 == 1, state.path
+                    path = plot.verts[-4:]
+                    plot.verts = plot.verts[:-3]
+                    plot.cmds = plot.cmds[:-3]
 
-                    v2 = state.path.pop(0)
+                    v1 = path[1]
+                    p = path[0] + path[2] - path[1]
+                    v2 = p - path[3] + path[2]
 
-                    while len(state.path) >= 2:
-                        v1 = v2
-                        p = state.path[0]
-                        v2 = state.path[1]
-                        state.path = state.path[2:]
-
-                        plot.add_point(Path.CURVE4, state.pos + v1 * state.curv[0])
-                        state.pos = state.pos + p
-                        plot.add_point(Path.CURVE4, state.pos - v2 * state.curv[1])
-
-                        plot.add_point(Path.CURVE4, state.pos)
-
-                    state.path.clear()
+                    plot.add_point(Path.CURVE4, v1)
+                    plot.add_point(Path.CURVE4, v2)
+                    plot.add_point(Path.CURVE4, p)
+                    state.pos = p
 
                 case "S":
                     begin = 0
@@ -236,7 +227,13 @@ class Program:
                     state.stretch_x(v)
                     state.stretch_y(v)
                 case "r":
+                    state.rotate(-_args(1)[0])
+                case "l":
                     state.rotate(_args(1)[0])
+                case "R":
+                    state.rotate(-0.5+_args(1)[0])
+                case "L":
+                    state.rotate(0.5-_args(1)[0])
                 case "i":
                     state.shear_x(_args(1)[0])
                 case "j":
@@ -331,7 +328,7 @@ class Program:
 class Compiler:
     @staticmethod
     def _tokenize(prog):
-        tokens = [";"]
+        tokens = [" "]
         i = 0
 
         while i < len(prog):
@@ -368,12 +365,14 @@ class Compiler:
                 i += space.end()
 
             elif prog[i] == ",":
+                if tokens[-1] != ",":
+                    tokens.append(",")
                 i += 1
             else:
                 tokens.append(prog[i])
                 i += 1
 
-        tokens.append(";")
+        tokens.append(" ")
 
         return tokens
 
@@ -405,13 +404,13 @@ class Compiler:
                     prog[i:i+2] = [prog[i+1], prog[i]]
                     i += 1
 
-            elif prog[i] in ["x", "y", "z", "r"] and type(prog[i+1]) in [int, float]:
+            elif prog[i] in ["x", "y", "z", "l", "r", "L", "R"] and type(prog[i+1]) in [int, float]:
                 if type(prog[i-1]) in [int, float]:
                     prog[i-1] /= prog[i+1]
                     del prog[i+1]
                 else:
-                    prog[i:i+2] = [prog[i+1], "/", prog[i]]
-                    i += 2
+                    prog[i:i+2] = [1 / prog[i+1], prog[i]]
+                    i += 1
 
             elif type(prog[i]) is str and prog[i].startswith("$"):
                 if prog[i][1:].isdigit():
@@ -421,17 +420,22 @@ class Compiler:
                     references.append(i)
 
             elif prog[i] == "=":
-                assert type(prog[i-2]) is int
                 assert prog[i-1].startswith("$")
-                addr = i - 2
                 name = prog[i-1]
-                argc = prog[i-2]
 
+                if type(prog[i-2]) is int:
+                    argc = prog[i-2]
+                    del prog[i-2]
+                    i -= 1
+                else:
+                    argc = 0
+
+                addr = i - 1
                 functions[name] = (addr, argc)
-
-                del prog[i-2:i+1]
                 references.pop()
-                i -= 3
+
+                del prog[i-1:i+1]
+                i -= 2
 
             elif prog[i] == "?":
                 prog.insert(i, None)
@@ -443,6 +447,10 @@ class Compiler:
                 prog.insert(i, None)
                 i += 1
 
+            elif prog[i] == ",":
+                del prog[i]
+                i -= 1
+
             i += 1
 
         for i in conditionals:
@@ -450,9 +458,9 @@ class Compiler:
             for j, c in enumerate(prog[i+1:], start=i+1):
                 if c == " " and level == 0:
                     break
-                elif c in ["[", "("]:
+                elif c in ["{", "[", "("]:
                     level += 1
-                elif c in ["]", ")"]:
+                elif c in ["}", "]", ")"]:
                     level -= 1
 
                 if level < 0:
@@ -539,11 +547,15 @@ class Plot:
         verts[1:][move_curs[1:]] = verts[:-1][move_curs[:-1]]
 
         links = (codes == PATH_LINK_LAST)
-        codes[1:-1][links[2:]] = Path.LINETO
+        codes[:-1][links[1:]] = Path.LINETO
 
         nlinks = np.logical_not(links)
         codes = codes[nlinks]
         verts = verts[nlinks]
+
+        if codes[0] != Path.MOVETO:
+            codes = np.hstack([[Path.MOVETO], codes])
+            verts = np.vstack([[self.verts[0]], verts])
 
         assert len(codes) == len(verts)
 
