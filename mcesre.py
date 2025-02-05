@@ -23,6 +23,7 @@ P = lambda x, y: np.array([x, y], dtype="double")
 
 class State:
     def __init__(self):
+        self.iteration = 0
         self.path = []
         self.stack = []
         self.pos = P(0, 0)
@@ -96,6 +97,8 @@ class Program:
     def _exec(self, plot, state, single_statement=False, ip=0):
         # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
+        stack_top = len(state.stack)
+        stack_drop = 0
 
         def _args(n):
             assert len(state.stack) >= n
@@ -104,7 +107,7 @@ class Program:
             return args
 
         while ip < len(self.prog):
-            # print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
+            print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
 
             if type(self.prog[ip]) in [int, float]:
                 state.stack.append(self.prog[ip])
@@ -118,7 +121,10 @@ class Program:
 
                 case "$":
                     arg, = _args(1)
-                    state.stack.append(initial_state.stack[-arg])
+                    if arg:
+                        state.stack.append(initial_state.stack[-arg])
+                    else:
+                        state.stack.append(state.iteration)
 
                 case "|":
                     pos = state.pos
@@ -257,10 +263,22 @@ class Program:
                 case ":":
                     start = ip + 1
                     for n in range(*_args(1)):
+                        state.iteration = n
                         state, ip = self._exec(plot, state=state, single_statement=True, ip=start)
                     ip -= 1
 
+                case "=":
+                    stack_drop, *_ = _args(1)
+
                 case "!":
+                    addr, *_ = _args(1)
+                    state, _ = self._exec(plot, state=state, single_statement=True, ip=addr)
+
+                case "@":
+                    addr, idx = _args(2)
+                    state.stack.append(self.prog[addr + idx])
+
+                case "`":
                     addr, argc = _args(2)
                     key = (addr, tuple(state.stack[len(state.stack)-argc:]))
                     arg0 = len(state.stack)
@@ -321,6 +339,7 @@ class Program:
 
             ip += 1
 
+        del state.stack[stack_top - stack_drop:stack_top]
         #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
         return state, ip
 
@@ -337,6 +356,13 @@ class Compiler:
                     tokens.append(" ")
 
                 i += ident.end()
+
+            elif string := re.match(r'^".*?(?<!\\)"', prog[i:]):
+                tokens.append(string[0][1:-1])
+                i += string.end()
+
+            elif sep := re.match(r"^,\s*", prog[i:]):
+                i += sep.end()
 
             elif num := re.match(r"^\d*\.?\d+(e[+-]?\d+)?", prog[i:]):
                 i += num.end()
@@ -364,10 +390,6 @@ class Compiler:
                     tokens.append(" ")
                 i += space.end()
 
-            elif prog[i] == ",":
-                if tokens[-1] != ",":
-                    tokens.append(",")
-                i += 1
             else:
                 tokens.append(prog[i])
                 i += 1
@@ -393,9 +415,10 @@ class Compiler:
 
         i = 1
         while i < len(prog)-1:
-            # print(f"{i:<3}: ", *prog)
+            # print(f"{i:<3}: {prog[i]:<3} ", prog[i-3:i+3])
 
-            if prog[i] in ["+", "-", "*", "/", "p"]:
+            # infix
+            if prog[i] in ["+", "-", "*", "/", "p", "@"]:
                 if type(prog[i+1]) in [int, float] and type(prog[i-1]) in [int, float]:
                     prog[i-1] = operations[prog[i]](prog[i-1], prog[i+1])
                     del prog[i:i+2]
@@ -415,7 +438,7 @@ class Compiler:
             elif type(prog[i]) is str and prog[i].startswith("$"):
                 if prog[i][1:].isdigit():
                     prog[i] = int(prog[i][1:])
-                    prog.insert(i + 1, "$")
+                    prog.insert(i, "$")
                 else:
                     references.append(i)
 
@@ -425,17 +448,25 @@ class Compiler:
 
                 if type(prog[i-2]) is int:
                     argc = prog[i-2]
-                    del prog[i-2]
-                    i -= 1
+
+                    if argc == 0:
+                        del prog[i-2]
+                        i -= 1
                 else:
                     argc = 0
 
+                del prog[i-1]
+                i -= 1
+
                 addr = i - 1
+
+                if argc == 0:
+                    del prog[i]
+                    addr = i
+                    i -= 1
+
                 functions[name] = (addr, argc)
                 references.pop()
-
-                del prog[i-1:i+1]
-                i -= 2
 
             elif prog[i] == "?":
                 prog.insert(i, None)
@@ -443,13 +474,11 @@ class Compiler:
                 i += 1
 
             elif prog[i] == "!":
-                calls.append(i)
-                prog.insert(i, None)
-                i += 1
-
-            elif prog[i] == ",":
-                del prog[i]
-                i -= 1
+                if type(prog[i-1]) is str and prog[i-1].startswith("$"):
+                    prog[i] = "`"
+                    calls.append(i)
+                    prog.insert(i, None)
+                    i += 1
 
             i += 1
 
