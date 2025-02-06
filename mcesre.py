@@ -107,7 +107,7 @@ class Program:
             return args
 
         while ip < len(self.prog):
-            print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
+            # print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
 
             if type(self.prog[ip]) in [int, float]:
                 state.stack.append(self.prog[ip])
@@ -122,7 +122,7 @@ class Program:
                 case "$":
                     arg, = _args(1)
                     if arg:
-                        state.stack.append(initial_state.stack[-arg])
+                        state.stack.append(initial_state.stack[stack_top-arg])
                     else:
                         state.stack.append(state.iteration)
 
@@ -306,6 +306,7 @@ class Program:
                         p0 = len(plot.verts)
                         tra0 = np.linalg.inv(state.transformation_matrix)
                         pos0 = state.pos
+                        arg0 = len(state.stack)
 
                         state, _ = self._exec(plot, state=state, single_statement=True, ip=addr)
 
@@ -323,8 +324,6 @@ class Program:
 
                             self.mem[key] = (tra, dpos, verts, plot.cmds[p0:], ret)
 
-                        del state.stack[arg0-argc:arg0]
-
                 case "?":
                     cond, stmt_end = _args(2)
 
@@ -339,8 +338,10 @@ class Program:
 
             ip += 1
 
+        # print("exec del:", state.stack[stack_top - stack_drop:stack_top])
         del state.stack[stack_top - stack_drop:stack_top]
-        #print(f"exec {ip} {depth}: \"{''.join(map(str, prog[start:ip]))}\"", state.stack)
+
+        # print(f"exec {ip}:", state.stack)
         return state, ip
 
 
@@ -423,9 +424,17 @@ class Compiler:
                     prog[i-1] = operations[prog[i]](prog[i-1], prog[i+1])
                     del prog[i:i+2]
                     i -= 1
-                elif type(prog[i+1]) in [int, float] or prog[i+1].startswith("$"):
+                elif type(prog[i+1]) in [int, float]:
                     prog[i:i+2] = [prog[i+1], prog[i]]
                     i += 1
+                elif prog[i+1].startswith("$"):
+                    if prog[i+1][1:].isdigit():
+                        prog[i:i+2] = [int(prog[i+1][1:]), "$", prog[i]]
+                        i += 2
+                    else:
+                        prog[i:i+2] = [prog[i+1], prog[i]]
+                        references.append(i)
+                        i += 1
 
             elif prog[i] in ["x", "y", "z", "l", "r", "L", "R"] and type(prog[i+1]) in [int, float]:
                 if type(prog[i-1]) in [int, float]:
@@ -438,7 +447,8 @@ class Compiler:
             elif type(prog[i]) is str and prog[i].startswith("$"):
                 if prog[i][1:].isdigit():
                     prog[i] = int(prog[i][1:])
-                    prog.insert(i, "$")
+                    prog.insert(i+1, "$")
+                    i += 1
                 else:
                     references.append(i)
 
