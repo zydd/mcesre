@@ -359,7 +359,7 @@ class Compiler:
                 i += ident.end()
 
             elif string := re.match(r'^".*?(?<!\\)"', prog[i:]):
-                tokens.append(string[0][1:-1])
+                tokens.extend(map(ord, string[0][1:-1]))
                 i += string.end()
 
             elif sep := re.match(r"^,\s*", prog[i:]):
@@ -427,7 +427,7 @@ class Compiler:
                 elif type(prog[i+1]) in [int, float]:
                     prog[i:i+2] = [prog[i+1], prog[i]]
                     i += 1
-                elif prog[i+1].startswith("$"):
+                elif type(prog[i+1]) is str and prog[i+1].startswith("$"):
                     if prog[i+1][1:].isdigit():
                         prog[i:i+2] = [int(prog[i+1][1:]), "$", prog[i]]
                         i += 2
