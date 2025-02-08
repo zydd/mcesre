@@ -25,8 +25,8 @@ M
 $goss0=[1r6 1z2 >  5r6 >  4r6 >>    2r6 >  1r6 > ]
 
 # gos
-1$gos=,[?$1-1[    $1$gos! 1r6   $1$gosi!      2r6 $1$gosi!  5r6 $1$gos!  4r6 $1$1$gos!$gos! 5r6 $1$gosi!]b $gos0!]
-1$gosi=[?$1-1[5r6 $1$gos! 1r6 $1$1$gosi!$gosi!  2r6 $1$gosi!  1r6 $1$gos!  4r6   $1$gos!    5r6 $1$gosi!]b $gosi0!]
+1$gos=,[$1?$1-1[    $2$gos! 1r6   $2$gosi!      2r6 $2$gosi!  5r6 $2$gos!  4r6 $2$gos!$2$gos! 5r6 $2$gosi!]b $gos0!]
+1$gosi=[$1?$1-1[5r6 $2$gos! 1r6 $2$gosi!$2$gosi!  2r6 $2$gosi!  1r6 $2$gos!  4r6   $2$gos!    5r6 $2$gosi!]b $gosi0!]
 $gos0=,[2z5     > 1r6  >  2r6 >  5r6 >  4r6 >>  5r6 >]
 $gosi0=[2z5 5r6 > 1r6 >>  2r6 >  1r6 >  4r6 >   5r6 >]
 

@@ -6,7 +6,6 @@ import time
 
 import numpy as np
 
-import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.path as mpath
@@ -94,10 +93,9 @@ class Program:
         self.prog = prog
         self.functions = functions
 
-    def _exec(self, plot, state, single_statement=False, ip=0):
+    def _exec(self, plot, state, ip, stack_top, single_statement=False):
         # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
         initial_state = state.clone()
-        stack_top = len(state.stack)
         stack_drop = 0
 
         def _args(n):
@@ -122,7 +120,7 @@ class Program:
                 case "$":
                     arg, = _args(1)
                     if arg:
-                        state.stack.append(initial_state.stack[stack_top-arg])
+                        state.stack.append(state.stack[stack_top+arg-1])
                     else:
                         state.stack.append(state.iteration)
 
@@ -132,14 +130,15 @@ class Program:
                     state.pos = pos
 
                 case "[":
-                    st, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
-                    state.pos = st.pos
+                    tm = state.transformation_matrix
+                    state, ip = self._exec(plot, state, ip + 1, stack_top)
+                    state.transformation_matrix = tm
 
                 case "]":
                     break
 
                 case "(":
-                    _, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
+                    _, ip = self._exec(plot, state.clone(), ip + 1, stack_top)
                     plot.add_point(Path.MOVETO, state.pos)
 
                 case ")":
@@ -147,7 +146,7 @@ class Program:
 
                 case "{":
                     p0 = len(plot.verts)
-                    st, ip = self._exec(plot, state=state.clone(), ip=ip + 1)
+                    st, ip = self._exec(plot, state.clone(), ip + 1, stack_top)
                     state.pos = st.pos
                     pos = plot.verts[-1]
                     plot.cmds = plot.cmds[:p0]
@@ -259,20 +258,24 @@ class Program:
                 case "p":
                     base, exp = _args(2)
                     state.stack.append(base ** exp)
+                case "G":
+                    lhs, rhs = _args(2)
+                    state.stack.append(lhs > rhs)
 
                 case ":":
                     start = ip + 1
                     for n in range(*_args(1)):
                         state.iteration = n
-                        state, ip = self._exec(plot, state=state, single_statement=True, ip=start)
+                        state, ip = self._exec(plot, state, start, stack_top, single_statement=True)
                     ip -= 1
 
                 case "=":
                     stack_drop, *_ = _args(1)
+                    stack_top = len(state.stack) - stack_drop
 
                 case "!":
                     addr, *_ = _args(1)
-                    state, _ = self._exec(plot, state=state, single_statement=True, ip=addr)
+                    state, _ = self._exec(plot, state, addr, stack_top, single_statement=True)
 
                 case "@":
                     addr, idx = _args(2)
@@ -281,7 +284,6 @@ class Program:
                 case "`":
                     addr, argc = _args(2)
                     key = (addr, tuple(state.stack[len(state.stack)-argc:]))
-                    arg0 = len(state.stack)
 
                     if self.mem is not None and key in self.mem:
                         tra, dpos, verts, cmds, ret = self.mem[key]
@@ -300,15 +302,17 @@ class Program:
                         state.pos = state.pos + state.transform(dpos)
                         state.transformation_matrix = state.transformation_matrix @ tra
 
+                        arg0 = len(state.stack)
+                        # print("callm del", state.stack[arg0-argc:arg0], "stack=", state.stack)
                         del state.stack[arg0-argc:arg0]
                         state.stack.extend(ret)
                     else:
                         p0 = len(plot.verts)
                         tra0 = np.linalg.inv(state.transformation_matrix)
                         pos0 = state.pos
-                        arg0 = len(state.stack)
+                        arg0 = len(state.stack) - argc
 
-                        state, _ = self._exec(plot, state=state, single_statement=True, ip=addr)
+                        state, _ = self._exec(plot, state, addr, stack_top, single_statement=True)
 
                         if self.mem is not None:
                             tra = state.transformation_matrix @ tra0
@@ -338,8 +342,8 @@ class Program:
 
             ip += 1
 
-        # print("exec del:", state.stack[stack_top - stack_drop:stack_top])
-        del state.stack[stack_top - stack_drop:stack_top]
+        # print("exec del:", state.stack[stack_top:stack_top + stack_drop], state.stack)
+        del state.stack[stack_top:stack_top + stack_drop]
 
         # print(f"exec {ip}:", state.stack)
         return state, ip
@@ -412,6 +416,7 @@ class Compiler:
             "*": operator.mul,
             "/": operator.truediv,
             "p": operator.pow,
+            "G": operator.gt,
         }
 
         i = 1
@@ -419,7 +424,7 @@ class Compiler:
             # print(f"{i:<3}: {prog[i]:<3} ", prog[i-3:i+3])
 
             # infix
-            if prog[i] in ["+", "-", "*", "/", "p", "@"]:
+            if prog[i] in ["+", "-", "*", "/", "p", "G", "@"]:
                 if type(prog[i+1]) in [int, float] and type(prog[i-1]) in [int, float]:
                     prog[i-1] = operations[prog[i]](prog[i-1], prog[i+1])
                     del prog[i:i+2]
@@ -561,7 +566,7 @@ class Plot:
         # elif memoize and not self.mem:
         #     self.mem = dict()
 
-        prog._exec(self, self.state, ip=ip, single_statement=bool(ip))
+        prog._exec(self, self.state, ip, 0, single_statement=bool(ip))
 
         print(f"run time: {time.time() - t0:.2f} points: {len(self.verts)}")
         print(f"result: {self.state.stack}")
@@ -618,6 +623,10 @@ class Plot:
         ymax = verts[:,1].max()
         by = (ymax - ymin) * 0.1
         bx = (xmax - xmin) * 0.1
+
+        if bx == 0 and by == 0:
+            return
+
         ax.set_xlim(xmin - bx, xmax + bx)
         ax.set_ylim(ymin - by, ymax + by)
         ax.grid(zorder=-1, color="#323232")
