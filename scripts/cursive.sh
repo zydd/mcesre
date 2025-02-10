@@ -1,14 +1,18 @@
 
 .4i
-(9:$d@$0$draw!{>})
+(9:$set_1@$0$draw!{>})
 $newline!
 
-(9:$u@$0$draw!{>})
+(9:$set_2@$0$draw!{>})
 $newline!
 
-($d@8$draw! $d@0$draw! {>} $chr_i_!$chr_i_! $chr_13j$draw!)
+# (9:$set_3@$0$draw!{>})
+# $newline!
 
-0 3:+2
+$chr_i22_$draw!
+
+# ($set_1@8$draw! $set_1@0$draw! {>} $chr_i_!$chr_i_! $chr_13j$draw!)
+
 ]
 
 # ------------------------------
@@ -35,7 +39,9 @@ $dl2={1x4>vv}C
 $s2={2x3>}{^^>}{2x3>}s
 $z2={2x3>}{vv>}{2x3>}s
 
-$d=$chr_1_,$chr_2_,$chr_3_,$chr_4_,$chr_5_,$chr_6_,$chr_7_,$chr_8_,$chr_9_
+$set_1=$chr_1_,$chr_2_,$chr_3_,$chr_4_,$chr_5_,$chr_6_,$chr_7_,$chr_8_,$chr_9_
+$set_2=$chr_11j,$chr_12_,$chr_13j,$chr_14_,$chr_15j,$chr_16j,$chr_17j,$chr_18_,$chr_19j
+$set_3=$chr_21_,$chr_22_,$chr_23_,$chr_24_,$chr_25_,$chr_26_,$chr_27_,$chr_28_,$chr_29_
 
 # ------------------------------
 
@@ -125,8 +131,6 @@ $uc4={3y^}{5x12>^^^^}{3y4^}s
 $uu4=[2x3 {^}{^^^^>}{3x2>}s]
 $_u2={^^ 1x8>}
 
-$u=$chr_11j,$chr_12_,$chr_13j,$chr_14_,$chr_15j,$chr_16j,$chr_17j,$chr_18_,$chr_19j
-
 # ------------------------------
 
 $chr_13j=
@@ -209,41 +213,105 @@ $chr_17j=
 
 # ------------------------------
 
-$chr_23_=
+$chr_i23_=
     $chr_i_,
     $chr_13j!
 
-$chr_22_=
+$chr_i22_=
     $chr_i_,
     $chr_12_!
 
-$chr_21_=
+$chr_i21_=
     $chr_i_,
     $chr_11j!
 
-$chr_26_=
+$chr_i26_=
     $chr_i_,
     $chr_16j!
 
-$chr_25_=
+$chr_i25_=
     $chr_i_,
     $chr_15j!
 
-$chr_24_=
+$chr_i24_=
     $chr_i_,
     $chr_14_!
 
-$chr_29_=
+$chr_i29_=
     $chr_i_,
     $chr_19j!
 
-$chr_28_=
+$chr_i28_=
     $chr_i_,
     $chr_18_!
 
-$chr_27_=
+$chr_i27_=
     $chr_i_,
     $chr_17j!
+
+# ------------------------------
+
+$acute=(
+    $_u2!
+    {1y3^ 1x2>}
+    M{1z3 >^}C
+)
+$dot_up=(
+    $_u2!
+    {1y3^ 1x2>}
+    1r8
+    1z8
+    4:>1l4
+)
+$bar=(
+    $_u2!
+    {1y2^ 1x2>}
+    3x2>
+)
+$bar2=(
+    $_u2!
+    {1y2^ 1x3>}
+    >
+)
+
+# ------------------------------
+
+
+$chr_23_=
+    $bar,
+    $chr_3_!
+
+$chr_22_=
+    $dot_up,
+    $chr_2_!
+
+$chr_21_=
+    $dot_up,
+    $chr_1_!
+
+$chr_26_=
+    $bar2,
+    $chr_6_!
+
+$chr_25_=
+    $bar,
+    $chr_5_!
+
+$chr_24_=
+    $bar2,
+    $chr_4_!
+
+$chr_29_=
+    $bar,
+    $chr_9_!
+
+$chr_28_=
+    $bar,
+    $chr_8_!
+
+$chr_27_=
+    $bar2,
+    $chr_7_!
 
 # ------------------------------
 
