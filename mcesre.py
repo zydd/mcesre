@@ -369,6 +369,10 @@ class Compiler:
             elif sep := re.match(r"^,\s*", prog[i:]):
                 i += sep.end()
 
+            elif eq := re.match(r"^=\s*", prog[i:]):
+                tokens.append("=")
+                i += eq.end()
+
             elif num := re.match(r"^\d*\.?\d+(e[+-]?\d+)?", prog[i:]):
                 i += num.end()
                 num = num[0]
@@ -461,23 +465,17 @@ class Compiler:
                 assert prog[i-1].startswith("$")
                 name = prog[i-1]
 
-                if type(prog[i-2]) is int:
-                    argc = prog[i-2]
-
-                    if argc == 0:
-                        del prog[i-2]
-                        i -= 1
-                else:
-                    argc = 0
-
                 del prog[i-1]
                 i -= 1
 
-                addr = i - 1
-
-                if argc == 0:
-                    del prog[i]
+                if type(prog[i-1]) is int:
+                    argc = prog[i-1]
+                    addr = i-1
+                else:
+                    argc = 0
                     addr = i
+
+                    del prog[i]
                     i -= 1
 
                 functions[name] = (addr, argc)
@@ -489,7 +487,7 @@ class Compiler:
                 i += 1
 
             elif prog[i] == "!":
-                if type(prog[i-1]) is str and prog[i-1].startswith("$"):
+                if type(prog[i-1]) is str and prog[i-1].startswith("$") and len(prog[i-1]) > 1:
                     prog[i] = "`"
                     calls.append(i)
                     prog.insert(i, None)
@@ -526,7 +524,6 @@ class Compiler:
     def compile(code):
         tokens = Compiler._tokenize(code)
         prog, functions = Compiler._preprocess(tokens)
-        print(*prog)
         return Program(prog, functions)
 
 
@@ -550,16 +547,13 @@ class Plot:
         self.verts.append(point)
         self.cmds.append(cmd)
 
-    def run(self, prog, *args):
-        t0 = time.time()
-
+    def run(self, prog, fn=None, *args):
         ip = 0
-        if args and type(args[0]) is str:
-            ip, argc = prog.functions[args[0]]
-            args = args[1:]
-            assert len(args) == argc
+        if fn is not None:
+            ip, argc = prog.functions[fn]
+            # assert len(args) == argc
 
-        self.state.stack = list(reversed(args))
+        self.state.stack = list(args)
 
         # if not memoize:
         #     self.mem = None
@@ -567,9 +561,7 @@ class Plot:
         #     self.mem = dict()
 
         prog._exec(self, self.state, ip, 0, single_statement=bool(ip))
-
-        print(f"run time: {time.time() - t0:.2f} points: {len(self.verts)}")
-        print(f"result: {self.state.stack}")
+        return self.state.stack
 
     def run_code(self, prog, *args):
         return self.run(Compiler.compile(prog), *args)
@@ -603,13 +595,13 @@ class Plot:
 
         assert len(codes) == len(verts)
 
-        print(f"gen time: {time.time() - t0:.2f} points: {len(codes)}")
+        # print(f"gen time: {time.time() - t0:.2f} points: {len(codes)}")
         return codes, verts
 
     def show(self, scale=1):
         codes, verts = self.get_path()
 
-        t0 = time.time()
+        # t0 = time.time()
 
         fig, ax = plt.subplots(figsize=(8*scale, 6*scale))
         pp1 = mpatches.PathPatch(Path(verts, codes), zorder=2, fill=False)
@@ -634,7 +626,7 @@ class Plot:
 
         plt.tight_layout()
 
-        print(f"plt time: {time.time() - t0:.2f}")
+        # print(f"plt time: {time.time() - t0:.2f}")
         plt.show()
 
 
@@ -642,6 +634,13 @@ if __name__ == "__main__":
     with open(sys.argv[1], "r", encoding="utf8") as f:
         prog = Compiler.compile(f.read())
 
+    print(*prog.prog)
+
     plot = Plot()
-    plot.run(prog)
+
+    t0 = time.time()
+    res = plot.run(prog)
+    print(f"run time: {time.time() - t0:.2f} points: {len(plot.verts)}")
+    print(f"result: {res}")
+
     plot.show()
