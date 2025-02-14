@@ -621,7 +621,7 @@ class Plot:
 
         ax.set_xlim(xmin - bx, xmax + bx)
         ax.set_ylim(ymin - by, ymax + by)
-        ax.grid(zorder=-1, color="#323232")
+        ax.grid(zorder=-1, color="#111")
         ax.set_aspect('equal')
 
         plt.tight_layout()
