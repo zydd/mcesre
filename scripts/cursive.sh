@@ -32,6 +32,8 @@ $d4d=M{1x4>vvvv}C
 $ru2r={2x3>}{^^>}{2x3>}s
 $r2u2r={3x2>}{3x2^^>}{2x3>}s
 $ru1u={1x3>}{2x4>^}{1y2^}s
+$r1u1u={1x6>}{1x4>^}{1y2^}s
+$r2u1u={2x3>}{>^}{1y2^}s
 $ru2u={1x3>}{>^^}{^}s
 $r1u2u=[1x2 {1x3>}{>^^}{^}s]
 $r2u2u={2x3>}{4x3>^^}{^}s
@@ -47,12 +49,14 @@ $rd2r={2x3>}{vv>}{2x3>}s
 
 $chr_3_=
     $ru2r,
+    $diacr,
     $rd2d,
     $uru2ru,
     $d2r
 
 $chr_2_=
     $ru2u,
+    $diac,
     $d2d,
     $uru2ru,
     $d2r
@@ -60,11 +64,13 @@ $chr_2_=
 $detail_1_end=v{vv}{1x2<}s
 $chr_1_=
     $ru2u,
+    $diac,
     $detail_1_end
 
 $detail_6_end={2x3>}{1x3>vv}{2x3<}s
 $chr_6_=
     $ru2r,
+    $diac,
     $detail_6_end
 
 $detail_5_mid=[1.4x
@@ -76,6 +82,7 @@ $detail_5_end=[.95y$d2r!]
 $chr_5_=
     $ru1u,
     $detail_5_mid,
+    $diacl,
     $detail_5_end
 
 $detail_4_mid={3x4^>}
@@ -83,16 +90,19 @@ $detail_4_end={<}{vv}{>}s
 $chr_4_=
     $ru1u,
     $detail_4_mid,
+    $diacl,
     $detail_4_end
 
 $chr_9_=
     $ru2r,
+    $diacr,
     $rd2d,
     $uu2r,
     $rd2r
 
 $chr_8_=
     $ru2u,
+    $diacr,
     $d2d,
     $uu2r,
     $rd2r
@@ -108,37 +118,42 @@ $detail_7_start_up=[
 $detail_7_end={1x2<}{1x4vv>}>s
 $chr_7_=
     $detail_7_start,
+    $diacl,
     $detail_7_end
 
 # ------------------------------
 
 $chr_13j=
     $ru2r,
+    $diacr,
     $rd2d,
     $uru2ru,
     $d4j,
     $hu2
 
 
-$chr_12up_=
+$chr_12dw_=
     $ru2u,
+    $diac,
     $d4d,
     $uru4ru,
     $d2r
-$chr_12dw_=
+$chr_12up1_=
     $ru4u,
     $d4d,
     $uru2ru,
+    $diac,
     $d2r
-
-$chr_12up_=
+$chr_12up2_=
     $ru2u,
+    $diac,
     $d2d,
     $uru4ru,
     $d4r
 
 $chr_11j=
     $ru2u,
+    $diac,
     $d4j,
     $hu2
 
@@ -146,6 +161,7 @@ $chr_11j=
 $detail_16_end={1x2>}{1x8vv>}{1x3<}s
 $chr_16j=
     $ru2r,
+    $diac,
     $detail_6_end,
     $detail_16_end,
     $hu2
@@ -154,22 +170,24 @@ $detail_15_end=[.975y$d4j!]
 $chr_15j=
     $ru1u,
     $detail_5_mid,
+    $diacl,
     $detail_15_end,
     $hu2
 $detail_15v2_d_end=[1/.95y$u2j!]
 $chr_15d=
     $ru1u,
     $detail_5_mid,
+    $diacl,
     $detail_15v2_d_end,
     $hd4
 
-$detail_14_mid=[
-    ({1.2y^}{.9y^>}{.15y 1x8>v}s)
-    {v}{v>}{1x4>}s
-]
+$detail_14_mid1={1.2y^}{.9y^>}{.15y 1x8>v}s{0.1y^}
+$detail_14_mid2={<v}{v}{v>}{1x4>}s
 $chr_14_=
     $ru1u,
-    $detail_14_mid,
+    $detail_14_mid1,
+    $diac,
+    $detail_14_mid2,
     $detail_16_end,
     $hu2
 
@@ -180,6 +198,7 @@ $detail_19_end=[
 
 $chr_19j=
     $ru2r,
+    $diac,
     $rd2d,
     $uu2r,
     $detail_19_end,
@@ -187,6 +206,7 @@ $chr_19j=
 
 $chr_18_=
     $ru2u,
+    $diac,
     $d4d,
     $uu4r,
     $rd2r
@@ -194,87 +214,31 @@ $chr_18_=
 $detail_17_end={<}{1x4vvvv<<}{2x3<}s
 $chr_17j=
     $detail_7_start,
+    $diacl,
     $detail_17_end,
     $hu2
 
 # ------------------------------
 
+$diac=b
+$diacl=b
+$diacr=b
+
 $acute=(
-    $hu2!
-    {1y3^ 1x2>}
-    M{1z3 >^}C
+    {2y3^ 1x6<}
+    M{1z2 >^}C
 )
-$dot0=(
+$dot=(
     {2y3^}
     1r8
     1z8
     4:^1l4
 )
-$bar0=(
-    {2y3^<}
-    3x2>
-)
-$bar1=(
-    {2y3^1x2<}
-    3x2>
-)
-$bar2=(
-    {2y3^}
-    <
-)
-
-
-# ------------------------------
-
-
-$chr_23_=
-    $ru2r,
-    $bar1,
-    $rd2d,
-    $uru2ru,
-    $d2r
-
-$chr_22_=
-    $ru2u,
-    $dot0,
-    $d2d,
-    $uru2ru,
-    $d2r
-
-$chr_21_=
-    $ru2u,
-    $dot0,
-    $detail_1_end
-
-$chr_26_=
-    $ru2r,
-    $bar0,
-    $detail_6_end
-$chr_24_=
-    $ru1u,
-    $detail_4_mid,
-    $dot0,
-    $detail_4_end
-
-$chr_29_=
-    $ru2r,
-    $bar1,
-    $rd2d,
-    $uu2r,
-    $rd2r
-
-$chr_28_=
-    $ru2u,
-    $bar1,
-    $d2d,
-    $uu2r,
-    $rd2r
-
-
-$chr_27_=
-    $detail_7_start,
-    $bar2,
-    $detail_7_end
+$dotl=({1x2<}$dot!)
+$dotr=({1x2>}$dot!)
+$barl=({2y3^}<)
+$barr=({2y3^}>)
+$barc=({2y3^ 2x3<}>)
 
 # ------------------------------
 
@@ -287,7 +251,12 @@ $chr_u_=$chr_i_!$chr_i_!
 $sub_dn=
     $hd4,$ru2r,0,
     $hd4,$hr1,$uu2r
-
+$sub_di=
+    $hd4,$ru2u,0,
+    $hd4,$r1u2u
+$sub_dl=
+    $hd4,$ru4u,0,
+    $hd4,$r1u4u
 
 $sub_jn=
     $hu2,$ru2r,0,
@@ -305,9 +274,9 @@ $sub_jd4=
     $hu2,$hr2,$r1u2u,$d4d,0,
     $hu2,$hr2,$hu2,$d4d
 
-$sub_j1i=
+$sub_j4=
     $hu2,$ru1u,0,
-    $hu2,$hu1
+    $hu2,$hr2,$r1u1u
 
 $sub_j2l=
     $hu2,$ru4u,0,
@@ -317,6 +286,9 @@ $sub_j2l=
 $sub_1i=
     $detail_1_end,$ru2u,0,
     $detail_1_end,$r2u2u
+$sub_14=
+    $detail_1_end,$ru1u,0,
+    $detail_1_end,$r2u1u
 $sub_1n=
     $detail_1_end,$ru2r,0,
     $detail_1_end,$r2u2r

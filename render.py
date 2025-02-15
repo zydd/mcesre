@@ -15,6 +15,21 @@ plot.run_code(".4i")
 path_i = plot.run(prog, "$chr_i_")
 space = prog.functions["$space"][0]
 
+# diac
+diac = prog.functions["$diac"][0]
+diacl = prog.functions["$diacl"][0]
+diacr = prog.functions["$diacr"][0]
+dot = prog.functions["$dot"][0]
+dotl = prog.functions["$dotl"][0]
+dotr = prog.functions["$dotr"][0]
+barc = prog.functions["$barc"][0]
+barl = prog.functions["$barl"][0]
+barr = prog.functions["$barr"][0]
+diac_map = {
+    diac: [dot, barc],
+    diacl: [dotl, barl],
+    diacr: [dotr, barr],
+}
 
 class Char:
     def __init__(self, n, fns):
@@ -22,18 +37,30 @@ class Char:
         self.fns = []
         self.cp = []
 
-        self.fns, self.cp = map(list, zip(*self._get_paths(n, fns)))
+        self.fns, self.cp = self._get_paths(n, fns)
 
         if n > 10:
-            for fn, path in self._get_paths(n - 10, fns):
+            for fn, path in zip(*self._get_paths(n - 10, fns)):
                 if fn[0] in "_iu":
                     self.fns.append("i" + fn[1:])
                     self.cp.append(path_i + path)
         if n > 20:
-            for fn, path in self._get_paths(n - 20, fns):
+            for fn, path in zip(*self._get_paths(n - 20, fns)):
                 if fn[0] in "_iu":
                     self.fns.append("u" + fn[1:])
                     self.cp.append(path_i * 2 + path)
+
+                for i in range(len(path)):
+                    if path[i] in diac_map:
+                        break
+                else:
+                    raise RuntimeError("diac marker not found")
+
+                for diac in diac_map[path[i]]:
+                    diac_path = list(path)
+                    diac_path[i] = diac
+                    self.fns.append(fn[:-1] + "a" + str(diac) + fn[-1])
+                    self.cp.append(diac_path)
 
         if not self.cp:
             raise RuntimeError(f"{n} in {fns}")
@@ -46,7 +73,7 @@ class Char:
         re_num = re.compile(rf"^.{n}([a-zA-Z]\w+)?.$")
         fns = [fn for fn in fns if re_num.match(fn)]
         paths = [plot.run(prog, f"$chr{fn}") for fn in fns]
-        return zip(fns, paths)
+        return fns, paths
 
     def path(self):
         return random.choice(self.cp)
@@ -91,7 +118,6 @@ for i, line in enumerate(text):
     code = []
     for word in line:
         for c in word:
-            print(chars[c].fns)
             code.extend(chars[c].path())
         code.append(space)
 
