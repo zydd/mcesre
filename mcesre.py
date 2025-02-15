@@ -1,3 +1,4 @@
+import collections
 import copy
 import operator
 import re
@@ -409,7 +410,7 @@ class Compiler:
 
     @staticmethod
     def _preprocess(prog):
-        functions = dict()
+        functions = collections.OrderedDict()
         conditionals = list()
         references = list()
         calls = list()
