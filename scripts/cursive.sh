@@ -73,20 +73,22 @@ $chr_6_=
     $diac,
     $detail_6_end
 
+$detail_5_begin=[1.4x $detail_4_mid!]
 $detail_5_mid=[1.4x
-    ({1.2y^}{.9y^>}{.15y 1x8>v}s)
+    {<v}
     {0.7yv}{0.5xv>}{1x4>}s
     {0.5x>}{1.9y .5x>^}{0.5y^}s
 ]
 $detail_5_end=[.95y$d2r!]
 $chr_5_=
     $ru1u,
-    $detail_5_mid,
+    $detail_5_begin,
     $diacl,
+    $detail_5_mid,
     $detail_5_end
 
-$detail_4_mid={3x4^>}
-$detail_4_end={<}{vv}{>}s
+$detail_4_mid={1.2y^}{.9y^>}{.15y 1x8>v}s{0.1y^}
+$detail_4_end={<v}{v}{v>}{1x4>}s
 $chr_4_=
     $ru1u,
     $detail_4_mid,
@@ -169,25 +171,25 @@ $chr_16j=
 $detail_15_end=[.975y$d4j!]
 $chr_15j=
     $ru1u,
-    $detail_5_mid,
+    $detail_5_begin,
     $diacl,
+    $detail_5_mid,
     $detail_15_end,
     $hu2
 $detail_15v2_d_end=[1/.95y$u2j!]
 $chr_15d=
     $ru1u,
-    $detail_5_mid,
+    $detail_5_begin,
     $diacl,
+    $detail_5_mid,
     $detail_15v2_d_end,
     $hd4
 
-$detail_14_mid1={1.2y^}{.9y^>}{.15y 1x8>v}s{0.1y^}
-$detail_14_mid2={<v}{v}{v>}{1x4>}s
 $chr_14_=
     $ru1u,
-    $detail_14_mid1,
+    $detail_4_mid,
     $diac,
-    $detail_14_mid2,
+    $detail_4_end,
     $detail_16_end,
     $hu2
 
