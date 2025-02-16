@@ -46,9 +46,12 @@ class Variant:
                 path[i] = diac_map[path[i]][diac]
                 break
         else:
-            raise RuntimeError("diac marker not found")
+            return None
 
         return Variant(self.id, self.start, self.end, self.desc, path, diac)
+
+    def has_diac_mark(self):
+        return not self._diac and any(p for p in self._path if p in diac_map)
 
     def path(self):
         return self._path
@@ -67,12 +70,18 @@ class Char:
 
         if n > 20:
             vars = self._get_variants(n - 10, fns)
-            self.variants.extend(var.diac("dot") for var in vars)
-            self.variants.extend(var.diac("bar") for var in vars)
+            for var in vars:
+                vard = var.diac("dot")
+                varb = var.diac("bar")
+                if vard: self.variants.append(vard)
+                if varb: self.variants.append(varb)
 
             vars = self._get_variants(n - 20, fns)
-            self.variants.extend(var.diac("dot") for var in vars)
-            self.variants.extend(var.diac("bar") for var in vars)
+            for var in vars:
+                vard = var.diac("dot")
+                varb = var.diac("bar")
+                if vard: self.variants.append(vard)
+                if varb: self.variants.append(varb)
 
             for var in (var for var in vars if var.start in "_iu"):
                 var._path = path_i * 2 + var._path
@@ -98,7 +107,7 @@ class Char:
         return random.choice(self.variants).path()
 
     def variant(self, diac):
-        return random.choice([var for var in self.variants if not var._diac]).diac(diac)
+        return random.choice([var for var in self.variants if var.has_diac_mark()]).diac(diac)
 
 
 char_fns = sorted([fn[4:] for fn in prog.functions if fn.startswith("$chr")])

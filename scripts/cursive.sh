@@ -144,11 +144,9 @@ $chr_12up1_=
     $ru4u,
     $d4d,
     $uru2ru,
-    $diac,
     $d2r
 $chr_12up2_=
     $ru2u,
-    $diac,
     $d2d,
     $uru4ru,
     $d4r
