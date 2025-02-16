@@ -1,3 +1,5 @@
+
+import collections
 import random
 import re
 import sys
@@ -16,67 +18,87 @@ path_i = plot.run(prog, "$chr_i_")
 space = prog.functions["$space"][0]
 
 # diac
-diac = prog.functions["$diac"][0]
-diacl = prog.functions["$diacl"][0]
-diacr = prog.functions["$diacr"][0]
-dot = prog.functions["$dot"][0]
-dotl = prog.functions["$dotl"][0]
-dotr = prog.functions["$dotr"][0]
-barc = prog.functions["$barc"][0]
-barl = prog.functions["$barl"][0]
-barr = prog.functions["$barr"][0]
-diac_map = {
-    diac: [dot, barc],
-    diacl: [dotl, barl],
-    diacr: [dotr, barr],
-}
+diac_map = dict()
+for marker in ["diac", "diacl", "diacr"]:
+    marker_id = prog.functions["$" + marker][0]
+    diac_map[marker_id] = dict()
+    for diac in ["dot", "bar", "trema"]:
+        diac_map[marker_id][diac] = prog.functions["$" + diac + marker[4:]][0]
+
+
+class Variant:
+    def __init__(self, id, start, end, desc, path, diac=None):
+        self.id = id
+        self.start = start
+        self.end = end
+        self._path = path
+        self.desc = desc
+        self._diac = diac
+
+    def __repr__(self):
+        return f"{self.start}{self.id}{self.desc if self.desc else ""}{self._diac if self._diac else ""}{self.end}"
+
+    def diac(self, diac):
+        path = list(self._path)
+
+        for i in range(len(path)):
+            if path[i] in diac_map:
+                path[i] = diac_map[path[i]][diac]
+                break
+        else:
+            raise RuntimeError("diac marker not found")
+
+        return Variant(self.id, self.start, self.end, self.desc, path, diac)
+
+    def path(self):
+        return self._path
 
 class Char:
     def __init__(self, n, fns):
-        self.n = n
-        self.fns = []
-        self.cp = []
-
-        self.fns, self.cp = self._get_paths(n, fns)
+        self.id = n
+        self.variants = self._get_variants(n, fns)
 
         if n > 10:
-            for fn, path in zip(*self._get_paths(n - 10, fns)):
-                if fn[0] in "_iu":
-                    self.fns.append("i" + fn[1:])
-                    self.cp.append(path_i + path)
+            vars = self._get_variants(n - 10, fns)
+            for var in (var for var in vars if var.start in "_iu"):
+                var._path = path_i + var.path()
+                var.start = "i"
+            self.variants.extend(vars)
+
         if n > 20:
-            for fn, path in zip(*self._get_paths(n - 20, fns)):
-                if fn[0] in "_iu":
-                    self.fns.append("u" + fn[1:])
-                    self.cp.append(path_i * 2 + path)
+            vars = self._get_variants(n - 10, fns)
+            self.variants.extend(var.diac("dot") for var in vars)
+            self.variants.extend(var.diac("bar") for var in vars)
 
-                for i in range(len(path)):
-                    if path[i] in diac_map:
-                        break
-                else:
-                    raise RuntimeError("diac marker not found")
+            vars = self._get_variants(n - 20, fns)
+            self.variants.extend(var.diac("dot") for var in vars)
+            self.variants.extend(var.diac("bar") for var in vars)
 
-                for diac in diac_map[path[i]]:
-                    diac_path = list(path)
-                    diac_path[i] = diac
-                    self.fns.append(fn[:-1] + "a" + str(diac) + fn[-1])
-                    self.cp.append(diac_path)
+            for var in (var for var in vars if var.start in "_iu"):
+                var._path = path_i * 2 + var._path
+                var.start = "u"
+            self.variants.extend(vars)
 
-        if not self.cp:
-            raise RuntimeError(f"{n} in {fns}")
+    def _get_variants(self, n, fns):
+        re_num = re.compile(rf"^(?P<start>.){n}(?P<desc>[a-zA-Z]\w+)?(?P<end>.)$")
+        variants = []
+        for fn in fns:
+            if match := re_num.match(fn):
+                var = Variant(
+                    id=n,
+                    start=match["start"],
+                    end=match["end"],
+                    desc=match["desc"],
+                    path=plot.run(prog, f"$chr{fn}"))
+                variants.append(var)
 
-        for c in self.cp:
-            if c[-1] == 0:
-                del c[-1]
-
-    def _get_paths(self, n, fns):
-        re_num = re.compile(rf"^.{n}([a-zA-Z]\w+)?.$")
-        fns = [fn for fn in fns if re_num.match(fn)]
-        paths = [plot.run(prog, f"$chr{fn}") for fn in fns]
-        return fns, paths
+        return variants
 
     def path(self):
-        return random.choice(self.cp)
+        return random.choice(self.variants).path()
+
+    def variant(self, diac):
+        return random.choice([var for var in self.variants if not var._diac]).diac(diac)
 
 
 char_fns = sorted([fn[4:] for fn in prog.functions if fn.startswith("$chr")])
@@ -84,7 +106,7 @@ chars = dict()
 for i in range(1, 30):
     if i not in [10, 20, 25]:
         chars[i] = Char(i, char_fns)
-print([ch.fns for ch in chars.values()])
+print([ch.variants for ch in chars.values()])
 
 def split_list_0(l):
     zero = l.index(0)
@@ -112,13 +134,26 @@ def sub(code):
                 idx[j] = 0
         i += 1
 
+def lig(word):
+    word = list(word)
+    i = 0
+    while i < len(word) - 1:
+        if word[i].id == word[i+1].id:
+            del word[i+1]
+            word[i] = word[i].variant("trema")
+        i += 1
+    return word
+
 text = eval(sys.argv[1])
 
 for i, line in enumerate(text):
     code = []
     for word in line:
+        word = [chars[c] for c in word]
+        word = lig(word)
+
         for c in word:
-            code.extend(chars[c].path())
+            code.extend(c.path())
         code.append(space)
 
     sub(code)

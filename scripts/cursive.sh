@@ -228,17 +228,16 @@ $acute=(
     {2y3^ 1x6<}
     M{1z2 >^}C
 )
-$dot=(
-    {2y3^}
-    1r8
-    1z8
-    4:^1l4
-)
+$_dot=[1r8 1z8 4:^1l4]
+$dot=({2y3^} $_dot!)
+$trema=({2y3^ 1x3<} $_dot! {2x3>} $_dot!)
 $dotl=({1x2<}$dot!)
 $dotr=({1x2>}$dot!)
+$tremal=({1x2<}$trema!)
+$tremar=({1x2>}$trema!)
 $barl=({2y3^}<)
 $barr=({2y3^}>)
-$barc=({2y3^ 2x3<}>)
+$bar=({2y3^ 2x3<}>)
 
 # ------------------------------
 
