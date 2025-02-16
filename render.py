@@ -18,13 +18,9 @@ path_i = plot.run(prog, "$chr_i_")
 space = prog.functions["$space"][0]
 
 # diac
-diac_map = dict()
-for marker in ["diac", "diacl", "diacr"]:
-    marker_id = prog.functions["$" + marker][0]
-    diac_map[marker_id] = dict()
-    for diac in ["dot", "bar", "trema"]:
-        diac_map[marker_id][diac] = prog.functions["$" + diac + marker[4:]][0]
-
+diac_markers = [prog.functions["$" + marker][0] for marker in ["diac", "diacl", "diacr"]]
+diac_map = {diac: prog.functions["$" + diac][0]
+                for diac in ["dot", "bar", "trema", "acute", "grave", "caron", "hat"]}
 
 class Variant:
     def __init__(self, id, start, end, desc, path, diac=None):
@@ -42,8 +38,14 @@ class Variant:
         path = list(self._path)
 
         for i in range(len(path)):
-            if path[i] in diac_map:
-                path[i] = diac_map[path[i]][diac]
+            if path[i] == diac_markers[0]:
+                path[i] = diac_map[diac]
+                break
+            elif path[i] == diac_markers[1]:
+                path[i:i+1] = [diac_markers[1], diac_map[diac], diac_markers[2]]
+                break
+            elif path[i] == diac_markers[2]:
+                path[i:i+1] = [diac_markers[2], diac_map[diac], diac_markers[1]]
                 break
         else:
             return None
@@ -51,10 +53,13 @@ class Variant:
         return Variant(self.id, self.start, self.end, self.desc, path, diac)
 
     def has_diac_mark(self):
-        return not self._diac and any(p for p in self._path if p in diac_map)
+        return not self._diac and any(p for p in self._path if p in diac_markers)
 
     def path(self):
-        return self._path
+        if self._diac:
+            return self._path
+        else:
+            return [c for c in self._path if c not in diac_markers]
 
 class Char:
     def __init__(self, n, fns):
@@ -64,7 +69,7 @@ class Char:
         if n > 10:
             vars = self._get_variants(n - 10, fns)
             for var in (var for var in vars if var.start in "_iu"):
-                var._path = path_i + var.path()
+                var._path = path_i + var._path
                 var.start = "i"
             self.variants.extend(vars)
 
@@ -100,7 +105,6 @@ class Char:
                     desc=match["desc"],
                     path=plot.run(prog, f"$chr{fn}"))
                 variants.append(var)
-
         return variants
 
     def path(self):
@@ -109,6 +113,8 @@ class Char:
     def variant(self, diac):
         return random.choice([var for var in self.variants if var.has_diac_mark()]).diac(diac)
 
+    def __repr__(self):
+        return repr(self.variants)
 
 char_fns = sorted([fn[4:] for fn in prog.functions if fn.startswith("$chr")])
 chars = dict()
@@ -150,6 +156,18 @@ def lig(word):
         if word[i].id == word[i+1].id:
             del word[i+1]
             word[i] = word[i].variant("trema")
+        elif word[i].id + 10 == word[i+1].id:
+            del word[i+1]
+            word[i] = word[i].variant("acute")
+        elif word[i].id + 20 == word[i+1].id:
+            del word[i+1]
+            word[i] = word[i].variant("caron")
+        elif word[i].id == word[i+1].id + 10:
+            del word[i]
+            word[i] = word[i].variant("grave")
+        elif word[i].id == word[i+1].id + 20:
+            del word[i]
+            word[i] = word[i].variant("hat")
         i += 1
     return word
 

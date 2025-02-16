@@ -186,7 +186,7 @@ $chr_15d=
 $chr_14_=
     $ru1u,
     $detail_4_mid,
-    $diac,
+    $diacl,
     $detail_4_end,
     $detail_16_end,
     $hu2
@@ -221,23 +221,17 @@ $chr_17j=
 # ------------------------------
 
 $diac=b
-$diacl=b
-$diacr=b
+$diacl={1x2<}
+$diacr={1x2>}
 
-$acute=(
-    {2y3^ 1x6<}
-    M{1z2 >^}C
-)
 $_dot=[1r8 1z8 4:^1l4]
 $dot=({2y3^} $_dot!)
-$trema=({2y3^ 1x3<} $_dot! {2x3>} $_dot!)
-$dotl=({1x2<}$dot!)
-$dotr=({1x2>}$dot!)
-$tremal=({1x2<}$trema!)
-$tremar=({1x2>}$trema!)
-$barl=({2y3^}<)
-$barr=({2y3^}>)
 $bar=({2y3^ 2x3<}>)
+$trema=({2y3^ 1x3<} $_dot! {2x3>} $_dot!)
+$acute=({2y3^ 1x6<} M{1z2 ^>}C)
+$grave=({2y3^ 1x6<} M{1z2 <^}C)
+$caron=({2y3^ 1x6<} 1z2 (M{<^}C) M{^>}C)
+$hat=({2y3^ 1x6<} 1z2 {>} (M{<^}C) {<<} (M{^>}C))
 
 # ------------------------------
 
