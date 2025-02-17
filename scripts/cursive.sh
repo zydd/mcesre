@@ -204,12 +204,13 @@ $chr_19j=
     $detail_19_end,
     $hu2
 
-$chr_18_=
+$chr_18j=
     $ru2u,
     $diac,
-    $d4d,
-    $uu4r,
-    $rd2r
+    $d2d,
+    $uu2r,
+    $detail_19_end,
+    $hu2
 
 $detail_17_end={<}{1x4vvvv<<}{2x3<}s
 $chr_17j=
