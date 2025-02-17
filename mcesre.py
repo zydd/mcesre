@@ -335,6 +335,9 @@ class Program:
                     if not cond:
                         ip = stmt_end - 1
 
+                case "P":
+                    _args(1)
+
                 case "b":
                     break
 

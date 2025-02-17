@@ -1,5 +1,5 @@
 
-import collections
+import copy
 import random
 import re
 import sys
@@ -10,6 +10,10 @@ random.seed(42)
 
 with open("scripts/cursive.sh", "r") as f:
     prog = mcesre.Compiler.compile(f.read())
+
+fn_names, addr_argc = list(zip(*prog.functions.items()))
+addrs, _ = zip(*addr_argc)
+fn_map = dict(zip(addrs, fn_names))
 
 plot = mcesre.Plot()
 plot.run_code(".4i")
@@ -66,14 +70,14 @@ class Char:
         self.id = n
         self.variants = self._get_variants(n, fns)
 
-        if n > 10:
+        if n > 10 and n < 30:
             vars = self._get_variants(n - 10, fns)
             for var in (var for var in vars if var.start in "_iu"):
                 var._path = path_i + var._path
                 var.start = "i"
             self.variants.extend(vars)
 
-        if n > 20:
+        if n > 20 and n < 30:
             vars = self._get_variants(n - 10, fns)
             for var in vars:
                 vard = var.diac("dot")
@@ -130,6 +134,53 @@ def split_list_0(l):
 sub_fns = [split_list_0(plot.run(prog, fn)) for fn in prog.functions if fn.startswith("$sub")]
 print(sub_fns)
 
+lig_fns = list(fn for fn in prog.functions if fn.startswith("$lig_"))
+print(sub_fns)
+re_lig = re.compile(
+    r"^\$lig(?P<start>.)"
+    r"(?P<d1>\d+)(?P<desc1>[a-zA-Z]\w+)?"
+    r"_"
+    r"(?P<d2>\d+)(?P<desc2>[a-zA-Z]\w+)?"
+    r"(?P<end>.)$"
+)
+for fn in lig_fns:
+    match = re_lig.match(fn)
+
+    id = int(match["d1"]) * 100 + int(match["d2"])
+    if id not in chars:
+        chars[id] = Char(id, [])
+
+    var = Variant(
+        id=id,
+        start=match["start"],
+        end=match["end"],
+        desc=fn,
+        path=plot.run(prog, fn)
+    )
+    chars[id].variants.append(var)
+
+    if id < 10 * 100:
+        id += 10 * 100
+        if id not in chars:
+            chars[id] = Char(id, [])
+
+        var1 = copy.deepcopy(var)
+        var1.id = id
+        var1._path = path_i + var1._path
+        chars[id].variants.append(var1)
+
+        id += 10 * 100
+        if id not in chars:
+            chars[id] = Char(id, [])
+        var2 = copy.deepcopy(var1)
+        var2.id = id
+        var2._path = path_i + var1._path
+        chars[id].variants.append(var2)
+
+        for diac in ["dot", "bar"]:
+            var2 = var.diac(diac)
+            var2.id = id
+            chars[id].variants.append(var2)
 
 def sub(code):
     idx = [0] * len(sub_fns)
@@ -145,6 +196,7 @@ def sub(code):
                     for j in range(len(sub_fns)):
                         idx[j] = max(0, idx[j] - len(find))
                     i -= 1
+                    # i += len(rep)
             else:
                 idx[j] = 0
         i += 1
@@ -153,7 +205,12 @@ def lig(word):
     word = list(word)
     i = 0
     while i < len(word) - 1:
-        if word[i].id == word[i+1].id:
+        combined_id = word[i].id * 100 + word[i+1].id
+        if combined_id in chars:
+            word[i] = chars[combined_id]
+            del word[i+1]
+            i -= 1
+        elif word[i].id == word[i+1].id:
             del word[i+1]
             word[i] = word[i].variant("trema")
         elif word[i].id + 10 == word[i+1].id:
@@ -184,6 +241,7 @@ for i, line in enumerate(text):
         code.append(space)
 
     sub(code)
+    print(",".join(map(lambda x: fn_map[x], code)))
     plot.run(prog, "$call_n", len(code), *code)
 
     if i < len(text) - 1:
