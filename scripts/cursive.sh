@@ -183,13 +183,20 @@ $chr_15d=
     $detail_15v2_d_end,
     $hd4
 
-$chr_14_=
+$chr_14j=
     $ru1u,
     $detail_4_mid,
     $diacl,
     $detail_4_end,
     $detail_16_end,
     $hu2
+$detail_14_mid=({vv 1y2v} {v}{6y4v 1x4<}{1x4<}s)
+$chr_14_=
+    $ru1u,
+    $detail_4_mid,
+    $diacl,
+    $detail_14_mid,
+    $detail_4_end
 
 $detail_19_end=[
     {>}{vvvv1x2>}{1x2<}s
@@ -309,5 +316,9 @@ $lig_7_11_=$chr_7_!$chr_1_!
 $lig_8_11_=$chr_8_!$chr_1_!
 $lig_9_11_=$chr_9_!$chr_1_!
 
-$lig_12dw_1_=$chr_12dw_!P$detail_1_end
 $lig_12up1_1_=$chr_12up1_!P$detail_1_end
+$lig_12dw_1_=$chr_12dw_!P$detail_1_end
+$lig_12dw_3_=$chr_12dw_!PP$uu4r$chr_3_+1!
+$lig_12dw_6_=$chr_12dw_!PP$uu4r$chr_6_+1!
+$lig_12dw_8_=$chr_12dw_!P$chr_8_+1!
+$lig_12dw_9_=$chr_12dw_!PP$uu4r$chr_9_+1!
