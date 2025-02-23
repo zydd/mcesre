@@ -93,6 +93,7 @@ class Program:
         self.mem = dict()
         self.prog = prog
         self.functions = functions
+        self.debug = False
 
     def _exec(self, plot, state, ip, stack_top, single_statement=False):
         # print(f"exec > \"{''.join(map(str, prog[ip:ip+4]))}\"", itr)
@@ -106,7 +107,7 @@ class Program:
             return args
 
         while ip < len(self.prog):
-            # print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
+            self.debug and print(f"{self.prog[ip]:<4} {ip} {state.pos}  {state.stack}")
 
             if type(self.prog[ip]) in [int, float]:
                 state.stack.append(self.prog[ip])
