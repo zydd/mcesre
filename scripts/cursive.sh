@@ -30,7 +30,7 @@ $u2j=^{^^ 1x2<}{1x2<}s{1x2>}
 $d2d=M{1x4>vv}C
 $d4d=M{1x4>vvvv}C
 $ru2r={2x3>}{^^>}{2x3>}s
-$r2u2r={3x2>}{3x2^^>}{2x3>}s
+$r2u2r={3x2>}{3x2^^>}{>}s
 $ru1u={1x3>}{2x4>^}{1y2^}s
 $r1u1u={1x6>}{1x4>^}{1y2^}s
 $r2u1u={2x3>}{>^}{1y2^}s
@@ -294,20 +294,32 @@ $sub_1n=
     $detail_1_end,$ru2r,0,
     $detail_1_end,$r2u2r
 
+
 $sub_6i=
     $detail_6_end,$ru2u,0,
     $detail_6_end,$r2u2u
+$sub_6n=
+    $detail_6_end,$ru2r,0,
+    $detail_6_end,$r2u2r
+
 
 
 $detail_lig_n1_end={1x3>}{1x3>vv}{1x2<}s
 $detail_lig_51_end=[.95y$detail_1_end!]
 
-$lig_2_1=$chr_2!P$detail_1_end
-$lig_3_1=$chr_3!P$detail_1_end
+$lig_2_1=$chr_2!P$chr_1+1!
+$lig_3_1=$chr_3!P$chr_1+1!
 $lig_5_1=$chr_5!P$detail_lig_51_end
-$lig_7_1=$chr_7!P$detail_1_end
-$lig_8_1=$chr_8!P$detail_lig_n1_end
-$lig_9_1=$chr_9!P$detail_lig_n1_end
+$lig_7_1=$chr_7!P$chr_1+1!
+$lig_8_1=$chr_8!P$chr_6+1!
+$lig_9_1=$chr_9!P$chr_6+1!
+
+$detail_lig_56_end=[{.925yv .05x<} 2x3 {1y2^ .1x>}{^>}>s]$detail_6_end!
+$lig_2_6=$chr_2!P$d2d$uu2r$chr_6+1!
+$lig_3_6=$chr_3!P$d2d$uu2r$chr_6+1!
+$lig_5_6=$chr_5!P$detail_lig_56_end
+$lig_8_6=$chr_8!P$rd2d$uu2r$chr_6+1!
+$lig_9_6=$chr_9!P$rd2d$uu2r$chr_6+1!
 
 $group_lig11=$chr_2,$chr_3,$chr_5,$chr_7,$chr_8,$chr_9
 $group_lig11x1=$chr_11j

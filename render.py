@@ -97,6 +97,7 @@ for fn in char_fns:
     )
 
 for char in list(chars.values()):
+    if char.id > 10: continue  # disable .j
     vars = []
     vars.extend(var.get_diac("dot") for var in char.variants if var.has_diac_mark())
     vars.extend(var.get_diac("bar") for var in char.variants if var.has_diac_mark())
