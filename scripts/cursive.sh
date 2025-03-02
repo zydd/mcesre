@@ -353,6 +353,11 @@ $detail_lig_12dw_7={4.2y^}{4y^ 7x6>}{7x6>}s
 $lig_12dw_7=$chr_12dw!PP$detail_lig_12dw_7$chr_7+1!
 $lig_12dw_17=$chr_12dw!PP$detail_lig_12dw_7$chr_17j+1!
 
+$lig_9_3=$chr_9!PPP$rd2d$uu2r$chr_3+1!
+$lig_9_7=$chr_9!PP$detail_7_start_up$chr_7+1!
+$group_g9=$chr_9
+2$prod_g9_c0=$1!PP$hu1$2+1!
+2$prod_g9_a0=$1!PP$hu1$2+1!
 
 # $group_0j=$chr_11j,$chr_13j,$chr_15j,$chr_16j,$chr_17j,$chr_18j,$chr_19j
 # $group_i0=$chr_1,$chr_2,$chr_8,$chr_11j,$chr_12up2,$chr_18j
@@ -361,8 +366,8 @@ $lig_12dw_17=$chr_12dw!PP$detail_lig_12dw_7$chr_17j+1!
 # $group_n0=$chr_3,$chr_6,$chr_9
 # 2$prod_0j_n0=$1!$hr3$uu2r$2+1!
 
-# $group_c0=$chr_4,$chr_14,$chr_14j
-# $group_a0=$chr_5,$chr_15d,$chr_15j
+$group_c0=$chr_4,$chr_14,$chr_14j
+$group_a0=$chr_5,$chr_15d,$chr_15j
 # 2$prod_0j_c0=$1!$hr2$r1u1u$2+1!
 # 2$prod_0j_a0=$1!$hr3$hu1$2+1!
 
