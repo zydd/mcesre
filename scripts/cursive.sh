@@ -328,20 +328,30 @@ $group_lig11x1=$chr_11j
 
 $lig_12up1_1=$chr_12up1!P$detail_1_end
 $lig_12dw_1=$chr_12dw!P$detail_1_end
+$lig_12up1_11=$chr_12up1!$chr_1!
+$lig_12dw_11=$chr_12dw!$chr_1!
 
 $group_12dw=$chr_12dw
-$group_s0=$chr_3,$chr_6,$chr_9
+$group_s0=$chr_3,$chr_6,$chr_9,$chr_13j,$chr_16j,$chr_19j
 2$prod_12dw_s0=$chr_12dw!PP$uu4r$2+1!
+
 $lig_12dw_8=$chr_12dw!P$chr_8+1!
+$lig_12dw_18=$chr_12dw!P$chr_18j+1!
 
 $lig_12_6=$chr_12up1!PP$uu2r$chr_6+1!
+$lig_12_16=$chr_12up1!PP$uu2r$chr_16j+1!
 
 $detail_lig_12dw_4={3y2^}{1x8>^^^}{9y8^}s
 $lig_12dw_4=$chr_12dw!PP$detail_lig_12dw_4$chr_4+1!
+$lig_12dw_14=$chr_12dw!PP$detail_lig_12dw_4$chr_14j+1!
+
 $lig_12dw_5=$chr_12dw!PP$detail_lig_12dw_4$chr_5+1!
+$lig_12dw_15j=$chr_12dw!PP$detail_lig_12dw_4$chr_15j+1!
+$lig_12dw_15d=$chr_12dw!PP$detail_lig_12dw_4$chr_15d+1!
 
 $detail_lig_12dw_7={4.2y^}{4y^ 7x6>}{7x6>}s
 $lig_12dw_7=$chr_12dw!PP$detail_lig_12dw_7$chr_7+1!
+$lig_12dw_17=$chr_12dw!PP$detail_lig_12dw_7$chr_17j+1!
 
 
 # $group_0j=$chr_11j,$chr_13j,$chr_15j,$chr_16j,$chr_17j,$chr_18j,$chr_19j
