@@ -113,6 +113,10 @@ $detail_7_start=[
     {1x3>}{1x2^>}{1y2^}s
     ^{7x6^>}{7x6>}s
 ]
+$detail_7_start_x2=[
+    {2x3>}{^>}{1y2^}s
+    ^{7x6^>}{7x6>}s
+]
 $detail_7_start_up=[
     ^
     ^{7x6^>}{7x6>}s
@@ -290,6 +294,9 @@ $sub_1i=
 $sub_14=
     $detail_1_end,$ru1u,0,
     $detail_1_end,$r2u1u
+$sub_17=
+    $detail_1_end,$detail_7_start,0,
+    $detail_1_end,$detail_7_start_x2
 $sub_1n=
     $detail_1_end,$ru2r,0,
     $detail_1_end,$r2u2r
@@ -301,6 +308,9 @@ $sub_6i=
 $sub_6n=
     $detail_6_end,$ru2r,0,
     $detail_6_end,$r2u2r
+$sub_67=
+    $detail_6_end,$detail_7_start,0,
+    $detail_6_end,$detail_7_start_x2
 
 
 
