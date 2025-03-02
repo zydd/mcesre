@@ -319,7 +319,9 @@ $lig_2_6=$chr_2!P$d2d$uu2r$chr_6+1!
 $lig_3_6=$chr_3!P$d2d$uu2r$chr_6+1!
 $lig_5_6=$chr_5!P$detail_lig_56_end
 $lig_8_6=$chr_8!P$rd2d$uu2r$chr_6+1!
+$lig_8_16=$chr_8!P$rd2d$uu2r$chr_16j+1!
 $lig_9_6=$chr_9!P$rd2d$uu2r$chr_6+1!
+$lig_9_16=$chr_9!P$rd2d$uu2r$chr_16j+1!
 
 $group_lig11=$chr_2,$chr_3,$chr_5,$chr_7,$chr_8,$chr_9
 $group_lig11x1=$chr_11j
@@ -353,8 +355,20 @@ $detail_lig_12dw_7={4.2y^}{4y^ 7x6>}{7x6>}s
 $lig_12dw_7=$chr_12dw!PP$detail_lig_12dw_7$chr_7+1!
 $lig_12dw_17=$chr_12dw!PP$detail_lig_12dw_7$chr_17j+1!
 
+
+$lig_8_7=$chr_8!PP$detail_7_start_up$chr_7+1!
+$lig_8_17=$chr_8!PP$detail_7_start_up$chr_17j+1!
+$group_g8=$chr_8
+2$prod_g8_s0=$chr_8!P$2+1!
+2$prod_g8_c0=$1!PP$hu1$2+1!
+2$prod_g8_a0=$1!PP$hu1$2+1!
+# TODO: 86, 891 ambiguity
+
+
 $lig_9_3=$chr_9!PPP$rd2d$uu2r$chr_3+1!
+$lig_9_13=$chr_9!PPP$rd2d$uu2r$chr_13j+1!
 $lig_9_7=$chr_9!PP$detail_7_start_up$chr_7+1!
+$lig_9_17=$chr_9!PP$detail_7_start_up$chr_17j+1!
 $group_g9=$chr_9
 2$prod_g9_c0=$1!PP$hu1$2+1!
 2$prod_g9_a0=$1!PP$hu1$2+1!
