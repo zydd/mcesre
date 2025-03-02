@@ -261,7 +261,7 @@ $sub_di=
     $hd4,$r1u2u
 $sub_dl=
     $hd4,$ru4u,0,
-    $hd4,$r1u4u
+    $hd4,$hr2,$r1u4u
 
 $sub_jn=
     $hu2,$ru2r,0,
