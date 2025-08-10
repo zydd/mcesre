@@ -48,7 +48,7 @@ class Variant:
                 path[i:i+1] = [diac_markers[2], diac_map[diac], diac_markers[1]]
                 break
         else:
-            return None
+            raise RuntimeError("No diacritic marker")
 
         return Variant(self.id, self.fn, path, diac)
 
@@ -62,7 +62,7 @@ class Variant:
             return [c for c in self._path if c not in diac_markers]
 
 class Char:
-    def __init__(self, n=None, variants=None):
+    def __init__(self, n=None, variants: list[Variant]|None = None):
         self.id = n
 
         if variants is None:
@@ -115,17 +115,17 @@ for char in list(chars.values()):
         chars[id].variants.extend(vars)
 
 
-print(chars)
+# print(chars)
 
 def split_list_0(l):
     zero = l.index(0)
     return l[:zero], l[zero+1:]
 
 sub_fns = [split_list_0(plot.run(prog, fn)) for fn in prog.functions if fn.startswith("$sub")]
-print(sub_fns)
+# print(sub_fns)
 
 lig_fns = list(fn for fn in prog.functions if fn.startswith("$lig_"))
-print(sub_fns)
+# print(lig_fns)
 re_lig = re.compile(
     r"^\$lig_"
     r"(?P<d1>\d+)(?P<desc1>[^_]\w*)?"
@@ -193,7 +193,7 @@ def sub(code):
                 idx[j] = 0
         i += 1
 
-def lig(word):
+def lig(word: list[Char]):
     word = list(word)
     i = 0
     while i < len(word) - 1:
@@ -207,15 +207,19 @@ def lig(word):
             elif word[i].id + 10 == word[i+1].id:
                 del word[i+1]
                 word[i] = word[i].variant("acute")
+                word[i].id = word[i].id * 101 + 10
             elif word[i].id + 20 == word[i+1].id:
                 del word[i+1]
                 word[i] = word[i].variant("caron")
+                word[i].id = word[i].id * 101 + 20
             elif word[i].id == word[i+1].id + 10:
                 del word[i]
                 word[i] = word[i].variant("grave")
+                word[i].id = word[i].id * 101 + 1000
             elif word[i].id == word[i+1].id + 20:
                 del word[i]
                 word[i] = word[i].variant("hat")
+                word[i].id = word[i].id * 101 + 2000
         else:
             # TODO: combine ligatures
             pass
@@ -226,11 +230,11 @@ text = eval(sys.argv[1])
 
 for i, line in enumerate(text):
     code = []
+    print(line)
+    line = [lig(lig([chars[c] for c in word])) for word in line]
+    print([[c.id for c in word] for word in line])
+    print("-")
     for word in line:
-        word = [chars[c] for c in word]
-        word = lig(word)
-        word = lig(word)
-
         for c in word:
             code.extend(c.path())
         code.append(space)
