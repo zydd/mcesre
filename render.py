@@ -22,7 +22,7 @@ space = prog.functions["$space"][0]
 # diac
 diac_markers = [prog.functions["$" + marker][0] for marker in ["diac", "diacl", "diacr"]]
 diac_map = {diac: prog.functions["$" + diac][0]
-                for diac in ["dot", "bar", "trema", "acute", "grave", "caron", "hat"]}
+                for diac in ["dot", "bar", "trema", "acute", "grave", "caron", "hat", "dgrave", "dacute"]}
 
 class Variant:
     def __init__(self, id, fn, path, diac=None):
@@ -208,6 +208,10 @@ def lig(word: list[Char]):
                 del word[i+1]
                 word[i] = word[i].variant("acute")
                 word[i].id = word[i].id * 101 + 10
+            elif word[i].id == (word[i+1].id - 20) * 101 + 10:
+                del word[i]
+                word[i] = chars[word[i].id - 20].variant("dacute")
+                word[i].id = word[i].id * 10101 + 1020
             elif word[i].id + 20 == word[i+1].id:
                 del word[i+1]
                 word[i] = word[i].variant("caron")
@@ -216,6 +220,10 @@ def lig(word: list[Char]):
                 del word[i]
                 word[i] = word[i].variant("grave")
                 word[i].id = word[i].id * 101 + 1000
+            elif word[i].id == word[i+1].id * 101 + 2010:
+                del word[i]
+                word[i] = word[i].variant("dgrave")
+                word[i].id = word[i].id * 10100 + 201000 + word[i].id
             elif word[i].id == word[i+1].id + 20:
                 del word[i]
                 word[i] = word[i].variant("hat")

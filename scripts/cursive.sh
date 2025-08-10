@@ -244,6 +244,8 @@ $acute=({2y3^ 1x6<} M{1z2 ^>}C)
 $grave=({2y3^ 1x6<} M{1z2 <^}C)
 $caron=({2y3^ 1x6<} 1z2 (M{<^}C) M{^>}C)
 $hat=({2y3^ 1x6<} 1z2 {>} (M{<^}C) {<<} (M{^>}C))
+$dgrave=({1x3<} $grave! {2x3>} $grave!)
+$dacute=({1x3<} $acute! {2x3>} $acute!)
 
 # ------------------------------
 
