@@ -97,10 +97,10 @@ for fn in char_fns:
     )
 
 for char in list(chars.values()):
-    if char.id > 10: continue  # disable .j
+    # if char.id > 10: continue  # disable .j
     vars = []
-    vars.extend(var.get_diac("dot") for var in char.variants if var.has_diac_mark())
-    vars.extend(var.get_diac("bar") for var in char.variants if var.has_diac_mark())
+    vars.extend(var.get_diac("dot") for var in char.variants if var.has_diac_mark() and not var.fn[-1] in ["i", "u"])
+    vars.extend(var.get_diac("bar") for var in char.variants if var.has_diac_mark() and not var.fn[-1] in ["i", "u"])
     if vars:
         id = 20 + char.id % 10
         if id not in chars:

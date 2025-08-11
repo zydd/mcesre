@@ -402,3 +402,28 @@ $group_a0=$chr_5,$chr_15d,$chr_15j
 # $group_lig7=$chr_7
 # $detail_lig7={4.2y^}{4y^>}{>}s
 # 2$prod_0j_lig7=$1!$hr3$detail_7_start_up$chr_7+1!
+
+
+
+# ------------------------------
+
+
+# $chr_11i=$prefix_i!$chr_1!
+# $chr_12i=$prefix_i!$chr_2!
+$chr_13i=$prefix_i!$chr_3!
+$chr_14i=$prefix_i!$chr_4!
+$chr_15i=$prefix_i!$chr_5!
+$chr_16i=$prefix_i!$chr_6!
+$chr_17i=$prefix_i!$chr_7!
+$chr_18i=$prefix_i!$chr_8!
+$chr_19i=$prefix_i!$chr_9!
+
+$chr_21u=$prefix_u!$chr_1!
+$chr_22u=$prefix_u!$chr_2!
+$chr_23u=$prefix_u!$chr_3!
+$chr_24u=$prefix_u!$chr_4!
+$chr_25u=$prefix_u!$chr_5!
+$chr_26u=$prefix_u!$chr_6!
+$chr_27u=$prefix_u!$chr_7!
+$chr_28u=$prefix_u!$chr_8!
+$chr_29u=$prefix_u!$chr_9!
