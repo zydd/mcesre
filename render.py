@@ -193,11 +193,34 @@ def sub(code):
                 idx[j] = 0
         i += 1
 
+
+def combine(a, b):
+    index = None
+    matched = 0
+    for i in range(len(a)):
+        for j in range(len(b)):
+            k = 0
+            while i + k < len(a) and j + k < len(b) and  a[i + k] == b[j + k]:
+                k += 1
+            if k > matched:
+                index = (i, j)
+                matched = k
+
+    if not index or matched < 2:
+        return
+
+    # do not match only suffix of `b`
+    if index[1] + matched == len(b):
+        return
+
+    return a[:index[0]] + b[index[1]:]
+
+
 def lig(word: list[Char]):
     word = list(word)
     i = 0
     while i < len(word) - 1:
-        if type(word[i].id) is int and  type(word[i+1].id) is int:
+        if type(word[i].id) is int and type(word[i+1].id) is int:
             combined_id = (word[i].id, word[i+1].id)
             if combined_id in chars:
                 word[i] = chars[combined_id]
@@ -228,8 +251,14 @@ def lig(word: list[Char]):
                 del word[i]
                 word[i] = word[i].variant("hat")
                 word[i].id = word[i].id * 101 + 2000
-        else:
-            # TODO: combine ligatures
+        elif type(word[i].id) is tuple and type(word[i+1].id) is int:
+            combined_id = (word[i].id[1], word[i+1].id)
+            if combined_id in chars:
+                print(word[i].id, word[i+1].id, word[i].path(), chars[combined_id].path())
+                comb = combine(word[i].path(), chars[combined_id].path())
+                if comb:
+                    word[i] = Variant(word[i].id + (word[i+1].id,), None, comb)
+                    del word[i + 1]
             pass
         i += 1
     return word

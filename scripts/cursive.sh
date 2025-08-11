@@ -49,9 +49,9 @@ $rd2r={2x3>}{vv>}{2x3>}s
 
 $chr_3=
     $ru2r,
-    $diacr,
     $rd2d,
     $uru2ru,
+    $diacl,
     $d2r
 
 $chr_2=
@@ -131,12 +131,11 @@ $chr_7=
 
 $chr_13j=
     $ru2r,
-    $diacr,
     $rd2d,
     $uru2ru,
+    $diacl,
     $d4j,
     $hu2
-
 
 $chr_12dw=
     $ru2u,
@@ -325,6 +324,9 @@ $lig_5_1=$chr_5!P$detail_lig_51_end
 $lig_7_1=$chr_7!P$chr_1+1!
 $lig_8_1=$chr_8!P$chr_6+1!
 $lig_9_1=$chr_9!P$chr_6+1!
+
+$detail_lig_15_13=[0.95y $hu2!$rd2d!$uru2ru!]
+$lig_15_13=$chr_15j!$detail_lig_15_13$chr_13j+4!
 
 $detail_lig_56_end=[{.925yv .05x<} 2x3 {1y2^ .1x>}{^>}>s]$detail_6_end!
 $lig_2_6=$chr_2!P$d2d$uu2r$chr_6+1!
